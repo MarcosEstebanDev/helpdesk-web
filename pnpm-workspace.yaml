@@ -1,0 +1,6 @@
+# Política de build-scripts de pnpm 11 (mismo criterio que helpdesk-api).
+# sharp: optimización de imágenes de Next -> permitido.
+# unrs-resolver: binario nativo usado por eslint -> permitido.
+allowBuilds:
+  sharp: true
+  unrs-resolver: true

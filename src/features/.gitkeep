@@ -1,0 +1,3 @@
+# Carpeta de features (vertical slices). Cada feature refleja un bounded context
+# del backend y agrupa: api/ (llamadas + tipos), hooks/ (useQuery/useMutation),
+# components/ y store/ propios. Ej. futuro: features/tickets, features/auth.
