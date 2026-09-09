@@ -1,16 +1,28 @@
-import { Button } from "@/components/ui/button";
+'use client';
 
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { useSession } from '@/features/auth/session';
+
+/**
+ * Raíz: manda a la bandeja o al login según haya sesión.
+ *
+ * Es un componente de cliente porque la decisión depende de si el refresh token
+ * sigue valiendo, y eso solo se sabe después de intentar canjearlo (ver
+ * `SessionProvider`). Un `redirect()` de servidor no tendría con qué decidir.
+ */
 export default function Home() {
+  const { status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === 'authenticated') router.replace('/tickets');
+    if (status === 'anonymous') router.replace('/login');
+  }, [status, router]);
+
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
-      <div className="space-y-3">
-        <h1 className="text-4xl font-semibold tracking-tight">Helpdesk</h1>
-        <p className="max-w-md text-muted-foreground">
-          SaaS de helpdesk multi-tenant y event-driven. Frontend en Next.js
-          App Router; backend NestJS con arquitectura hexagonal.
-        </p>
-      </div>
-      <Button disabled>Iniciar sesión (Fase 2)</Button>
+    <main className="flex flex-1 items-center justify-center">
+      <p className="text-sm text-muted-foreground">Cargando…</p>
     </main>
   );
 }

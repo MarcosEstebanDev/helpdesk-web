@@ -34,11 +34,52 @@ línea que el servidor). Node 24, pnpm 11.
 
 ## Estado actual (2026-09-09)
 
-**Fase 1 (scaffold) — CERRADA.** Commit `e34dcba`.
+**Fases 1, 2, 4, 6 y 7 (cliente) — CERRADAS.** El frontend ya se usa de punta a
+punta: entrar, abrir un ticket, conversarlo, operarlo como agente y configurar el
+SLA, con la pantalla actualizándose sola por WebSocket.
 
-**Fase 7 (cliente de tiempo real) — CERRADA.** Lo único de este repo que va por
-delante de la fase 1, porque el backend ya tenía el gateway listo.
+**Fase 2 (auth).** Login por `organizationSlug` + email + password, y registro
+self-service en la misma pantalla.
+- El **access token vive solo en memoria** (`auth-store`), así que cada recarga
+  empieza sin él. `SessionProvider` arranca canjeando la cookie httpOnly del
+  refresh: si funciona había sesión, si no el usuario es anónimo. De ahí el
+  estado `loading` — pintar el login mientras tanto haría parpadear la pantalla
+  a cualquiera que recargue estando dentro.
+- `status` se **deriva** del store, no se sincroniza con un efecto: con dos
+  estados en paralelo, cualquier cosa que limpiara la sesión (un `unauthorized`
+  del socket, un logout) dejaría al provider diciendo que sigue habiendo sesión.
+- **La guarda de ruta es de cliente, no un middleware.** El refresh está en una
+  cookie con `Path=/auth` que el navegador no manda al front, así que un
+  middleware en el servidor de Next no tendría con qué decidir. La guarda de
+  verdad la aplica la API en cada petición; esto solo evita pantallas vacías.
 
+**Fase 4 (tickets).** Bandeja con filtro por estado y paginación **por cursor**
+(`useInfiniteQuery`), detalle con conversación, abrir ticket, comentar, y para
+AGENT/ADMIN cambiar estado y asignar.
+- Solo se ofrecen las **transiciones legales** (ADR-0015 replicado en
+  `lib/api/types.ts`). Es UX: el backend responde 409 igual.
+- **No hay selector de personas para asignar**: el backend no expone ningún
+  endpoint para listar los miembros de la organización, y `assign` pide un UUID.
+  Se resolvió con "Asignármelo" + "Quitar asignación", que cubre el flujo real
+  de un agente sin inventar un endpoint que no existe. Si algún día aparece un
+  `GET /members`, ahí entra el selector.
+- Las mutaciones invalidan igual que lo haría el WebSocket, a propósito: el
+  evento llega por el outbox unos milisegundos después y solo si el socket está
+  vivo. Esperarlo dejaría al usuario mirando su propio cambio sin efecto.
+
+**Fase 6 (SLA).** Panel de relojes en el detalle y pantalla `/settings/sla`.
+- El margen de un reloj parado **se pinta tal como llega**; calcularlo contra
+  `Date.now()` haría que un ticket resuelto la semana pasada empeorase cada vez
+  que alguien abre la pantalla.
+- Un reloj vencido que el barrido aún no marcó se muestra como "vencido, sin
+  registrar": ni se miente diciendo que va bien, ni se adelanta al backend.
+- La configuración se edita **una prioridad a la vez**, como la expone la API.
+  `source` distingue lo pactado de lo de fábrica — sin eso no se sabe si tocar
+  un valor rompe un acuerdo.
+- La regla "no podés prometer resolver antes que responder" NO se duplica aquí:
+  vive en el dominio del backend y se muestra el error tal como llega.
+
+**Fase 7 (cliente de tiempo real) — CERRADA.**
 - `lib/realtime/events.ts` — contrato de los mensajes, **mantenido a mano**.
 - `lib/realtime/socket.ts` — token en el handshake (`auth`), nunca en la query
   string; solo transporte websocket; reconexión automática para cortes de red.
@@ -49,38 +90,41 @@ delante de la fase 1, porque el backend ya tenía el gateway listo.
   recupera) y vuelve a entrar en las salas que estaba siguiendo.
 - `lib/realtime/use-ticket-watch.ts` — sigue un ticket mientras el componente
   esté montado, con recuento por si dos componentes miran el mismo.
-- `lib/query/keys.ts` — claves canónicas. Existen antes que las pantallas a
-  propósito: si cada feature se inventa las suyas, el realtime invalida algo que
-  nadie lee y la pantalla se queda quieta sin que falle nada.
-- `lib/api/refresh.ts` — lo mínimo de sesión que el socket necesita para
-  sobrevivir a una expiración. **No es el login**, que es otra fase.
-- **Verificado:** `tsc --noEmit`, `pnpm lint` y `pnpm build` en verde.
+- `lib/query/keys.ts` — claves canónicas, compartidas por queries y realtime.
 
-## OJO: este repo va MUY por detrás del backend
+**Verificado:** `pnpm exec tsc --noEmit`, `pnpm lint` y `pnpm build` en verde, y
+los contratos comprobados contra la API real con curl (registro, me, tickets,
+comentarios, transición inválida, sla-policy y refresh).
 
-El backend tiene 7 fases cerradas; aquí solo están la 1 y el cliente de la 7.
-**No hay login, ni pantallas, ni un solo hook de datos.** En concreto faltan:
+## Gotchas
 
-- **Fase 2 (auth):** login por `organizationSlug` + email + password, arranque de
-  sesión con `/auth/refresh` al cargar, guardas de ruta. El store ya tiene sitio
-  para el usuario y el token.
-- **Fase 4 (tickets):** lista paginada **por cursor** (no por offset), detalle con
-  conversación, abrir ticket, comentar, y para AGENT asignar y cambiar estado.
-  Usar `ticketKeys` — el realtime ya invalida esas claves.
-- **Fase 6 (SLA):** el detalle del ticket trae `sla[]` con `status` y
-  `remainingMinutes`; pantalla de configuración en `/sla-policy` (solo ADMIN).
-- **Tests: no hay runner configurado.** El backend escribe tests junto al código
-  y aquí no hay ni Vitest ni Testing Library. Es la carencia más visible del repo.
+- **`enableCors()` del backend rompía todo esto y ningún test lo veía.** Devolvía
+  `Access-Control-Allow-Origin: *` sin credenciales, y el navegador descarta esa
+  respuesta cuando la petición lleva `credentials: 'include'`. Arreglado en el
+  backend (`CORS_ORIGINS`, commit `dc25055`). Si el front deja de hablar con la
+  API, mirar ahí antes que aquí.
+- La regla de ESLint `react-hooks/set-state-in-effect` es un error, no un aviso:
+  si hace falta llamar a `setState` en el cuerpo de un efecto, casi siempre el
+  estado se puede **derivar** en su lugar. Pasó dos veces en esta sesión.
+- Back y front usan el 3000 por defecto: levantar el front en otro puerto
+  (`PORT=3001 pnpm dev`) y que coincida con `CORS_ORIGINS` del backend.
 
-## Deuda conocida
+## OJO: qué falta
 
-- El contrato del WebSocket se mantiene a ojo: los eventos de Socket.io no están
-  en el OpenAPI (ADR-0004 cubre solo REST). Un cambio en `BroadcastTicketEvent`
-  del backend no rompe la compilación aquí.
-- El cliente REST sigue siendo `apiFetch` a mano; el cliente tipado generado
-  desde el OpenAPI está pendiente.
-- `apiFetch` no adjunta el access token todavía (no había sesión que adjuntar).
-  Al hacer la fase 2, ese es el sitio.
+- **No hay runner de tests.** Ni Vitest ni Testing Library. Es la carencia más
+  visible del repo y choca con la metodología del proyecto ("tests junto al
+  código"). Lo primero que habría que montar.
+- El cliente REST sigue escrito a mano (`apiFetch`); el cliente tipado generado
+  desde el OpenAPI (ADR-0004) está pendiente, y con él los tipos de
+  `lib/api/types.ts` dejarían de mantenerse a ojo.
+- El contrato del WebSocket (`lib/realtime/events.ts`) seguirá a mano igual: los
+  eventos de Socket.io no están en el OpenAPI.
+- `/auth/me` no devuelve el email, así que tras recuperar la sesión con el
+  refresh el usuario queda con el email vacío. Se rellena al hacer login.
+- No hay pantalla de invitación de miembros ni de gestión de roles (el backend
+  tampoco los expone).
+- El rastro de auditoría (`GET /tickets/:id/history`) tiene su hook
+  (`useTicketHistory`) pero ninguna pantalla lo usa todavía.
 
 ## Comandos
 
