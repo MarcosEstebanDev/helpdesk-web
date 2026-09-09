@@ -26,15 +26,34 @@ src/
 ├─ lib/
 │  ├─ api/client.ts # cliente HTTP tipado (baseURL, cookies, errores)
 │  ├─ env.ts        # validación Zod de NEXT_PUBLIC_*
-│  ├─ query/        # factory de QueryClient
+│  ├─ query/        # factory de QueryClient + claves canónicas (keys.ts)
+│  ├─ realtime/     # socket, contrato de eventos y useTicketWatch
 │  └─ utils.ts      # cn() de shadcn
-├─ providers/       # QueryProvider, WsProvider (placeholder Fase 7), AppProviders
-└─ stores/          # stores Zustand (auth-store placeholder)
+├─ providers/       # QueryProvider, WsProvider (realtime), AppProviders
+└─ stores/          # stores Zustand (auth-store: usuario + access token en memoria)
 ```
 
 **Decisión:** el frontend consume el backend vía su contrato **OpenAPI**
 (ADR-0004 en `helpdesk-api`); en fases posteriores se genera un cliente tipado
 desde ese spec, manteniendo estable el contrato de `lib/api/client.ts`.
+
+## Tiempo real
+
+La conexión de Socket.io vive en `WsProvider` (ADR-0022 y ADR-0023 del backend):
+
+- Se conecta con el access token en el handshake y se ata a él: sin token no hay
+  socket, y refrescarlo reconecta. El socket nunca sobrevive a su credencial.
+- **Lo que llega no se pinta: invalida caché de TanStack Query.** Los mensajes
+  traen lo justo para saber qué cambió — `comment.added` ni siquiera trae el
+  cuerpo — y la pantalla se actualiza al recargar con los permisos del usuario.
+- Los mensajes son **at-least-once**: pueden llegar repetidos. Invalidar dos
+  veces es inofensivo; acumular estado a partir de los eventos no lo sería.
+- `useTicketWatch(ticketId)` entra en la sala de un ticket mientras el
+  componente esté montado. Sin eso, el detalle no recibe sus avisos.
+
+⚠️ El contrato de los mensajes (`lib/realtime/events.ts`) **se mantiene a mano**:
+los eventos de WebSocket no están en el OpenAPI, así que un cambio en el backend
+no rompe la compilación aquí. Es deuda conocida.
 
 ## Desarrollo
 
