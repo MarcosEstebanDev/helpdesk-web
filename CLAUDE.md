@@ -92,7 +92,27 @@ AGENT/ADMIN cambiar estado y asignar.
   esté montado, con recuento por si dos componentes miran el mismo.
 - `lib/query/keys.ts` — claves canónicas, compartidas por queries y realtime.
 
-**Verificado:** `pnpm exec tsc --noEmit`, `pnpm lint` y `pnpm build` en verde, y
+**Tests (Vitest + Testing Library).** 36 tests junto al código (`*.test.ts[x]`),
+sobre lo que tiene lógica de verdad y no sobre el marcado:
+- `lib/api/client.test.ts` — el token se lee en CADA llamada (si se capturara al
+  importar, todo daría 401 tras el primer refresh), `credentials: 'include'`
+  siempre, y el `code` del RFC 7807 conservado (mapear por texto sería atarse a
+  la redacción).
+- `providers/ws-provider.test.tsx` — el orquestador: no conecta sin sesión,
+  reconecta al cambiar el token, `token_expired` refresca y `unauthorized` no
+  insiste, un comentario invalida SOLO su detalle, y al reconectar cierra el
+  hueco y vuelve a las salas. Se dobla la fábrica del socket, no socket.io.
+- `lib/realtime/use-ticket-watch.test.tsx` — el recuento de suscriptores: dos
+  componentes mirando el mismo ticket se suscriben una vez, y el primero en
+  cerrarse no deja al otro sin avisos.
+- `features/auth/session.test.tsx` — arranque en `loading`, recuperación por
+  refresh, y que perder el token deje la sesión anónima sola (prueba de que el
+  estado se DERIVA y no se sincroniza).
+- `features/tickets/components/sla-panel.test.tsx` — los tres estados del reloj,
+  incluido el vencido que el barrido aún no marcó.
+
+**Verificado:** `pnpm test` (36), `pnpm typecheck`, `pnpm lint` y `pnpm build` en
+verde, y
 los contratos comprobados contra la API real con curl (registro, me, tickets,
 comentarios, transición inválida, sla-policy y refresh).
 
@@ -111,9 +131,6 @@ comentarios, transición inválida, sla-policy y refresh).
 
 ## OJO: qué falta
 
-- **No hay runner de tests.** Ni Vitest ni Testing Library. Es la carencia más
-  visible del repo y choca con la metodología del proyecto ("tests junto al
-  código"). Lo primero que habría que montar.
 - El cliente REST sigue escrito a mano (`apiFetch`); el cliente tipado generado
   desde el OpenAPI (ADR-0004) está pendiente, y con él los tipos de
   `lib/api/types.ts` dejarían de mantenerse a ojo.
@@ -133,7 +150,9 @@ pnpm install
 cp .env.example .env.local   # NEXT_PUBLIC_API_URL apunta al backend
 pnpm dev                     # ojo: back y front usan 3000, mover uno
 pnpm lint
-pnpm exec tsc --noEmit
+pnpm typecheck
+pnpm test                    # vitest run
+pnpm test:watch
 pnpm build
 ```
 

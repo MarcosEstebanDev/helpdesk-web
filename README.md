@@ -62,8 +62,14 @@ pnpm install
 cp .env.example .env.local   # ajustar NEXT_PUBLIC_API_URL si hace falta
 pnpm dev                     # http://localhost:3000
 pnpm lint
+pnpm typecheck
+pnpm test                    # Vitest + Testing Library
 pnpm build                   # genera .next/standalone
 ```
+
+Los tests viven **junto al código** (`*.test.ts[x]`) y cubren lo que tiene
+lógica: el ciclo de vida del socket, el recuento de suscripciones a un ticket, el
+arranque de sesión y el cálculo de márgenes de SLA. El marcado no se testea.
 
 > Nota: tanto el front como el back usan el puerto 3000 por defecto. Para
 > correr ambos en local, levantar uno en otro puerto (ej. `PORT=3001 pnpm dev`).
