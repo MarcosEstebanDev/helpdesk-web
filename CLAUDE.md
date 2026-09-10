@@ -7,8 +7,14 @@
 ## Qué es
 
 Frontend del SaaS de **helpdesk multi-tenant y event-driven**. Proyecto de
-portfolio fullstack senior con **foco backend**: aquí el objetivo no es lucir UI,
-sino consumir bien un backend event-driven y no contradecir sus decisiones.
+portfolio fullstack senior con **foco backend**: lo primero es consumir bien un
+backend event-driven y no contradecir sus decisiones.
+
+Dicho eso, **la interfaz sí importa**, y desde 2026-09-10 tiene un lenguaje
+visual propio (ver "Capa de UI"): este es el único de los dos repos que es
+público, o sea el único que un reclutador puede abrir. Lo que NO cambió es la
+regla de fondo: **no se inventa nada que la API no diga** — sin nombres de
+usuario falsos, sin barras de progreso deducidas, sin estados adivinados.
 
 - Repo backend (separado, ADR-0001): `helpdesk-api` — **PRIVADO**.
 - **Este repo es PÚBLICO**: https://github.com/MarcosEstebanDev/helpdesk-web
@@ -92,7 +98,7 @@ AGENT/ADMIN cambiar estado y asignar.
   esté montado, con recuento por si dos componentes miran el mismo.
 - `lib/query/keys.ts` — claves canónicas, compartidas por queries y realtime.
 
-**Tests (Vitest + Testing Library).** 36 tests junto al código (`*.test.ts[x]`),
+**Tests (Vitest + Testing Library).** 50 tests junto al código (`*.test.ts[x]`),
 sobre lo que tiene lógica de verdad y no sobre el marcado:
 - `lib/api/client.test.ts` — el token se lee en CADA llamada (si se capturara al
   importar, todo daría 401 tras el primer refresh), `credentials: 'include'`
@@ -142,6 +148,52 @@ comentarios, transición inválida, sla-policy y refresh).
   tampoco los expone).
 - El rastro de auditoría (`GET /tickets/:id/history`) tiene su hook
   (`useTicketHistory`) pero ninguna pantalla lo usa todavía.
+
+## Capa de UI (2026-09-10)
+
+Lenguaje visual tomado del **Atlassian Design System**, a pedido del usuario.
+Sin dependencias nuevas: `@base-ui/react` ya estaba y trae `toast`, `tooltip`,
+`dialog` y `menu`.
+
+- **`globals.css`** — paleta de ADS en hex, con el nombre del token al lado
+  (`#172B4D` = N800, `#0C66E4` = B400). Dos cosas que no hay que "arreglar":
+  el texto **no es negro** sino azul-tinta, y el radio es de 4px porque
+  Atlassian es cuadrado. Tokens nuevos `--success` / `--warning` / `--info` /
+  `--danger` y los de cromo `--shell-*`: antes los badges tiraban de
+  `emerald-500` y `amber-500` crudos, que no responden al tema.
+- **Tema claro/oscuro a mano** (`providers/theme-provider.tsx` + `lib/theme.ts`).
+  Sin `next-themes`. Dos detalles que cuestan si se tocan: el script síncrono
+  del `<head>` (`guionAntiParpadeo`) evita el fogonazo blanco, y la preferencia
+  se lee con `useSyncExternalStore`, no con un `setState` en un efecto, que la
+  regla `react-hooks/set-state-in-effect` prohíbe.
+- **Marco** (`(app)/layout.tsx`) — barra superior fija + navegación lateral, que
+  en móvil pasa a panel. El panel se cierra en el `onClick` de cada enlace, no
+  con un efecto sobre el pathname (misma regla de ESLint).
+- **Bandeja** — anatomía de backlog: flecha de prioridad, `#número` en mono,
+  asunto, asignación, lozenge de estado y tiempo relativo. Bajo `sm` los
+  metadatos caen a una segunda línea en vez de comprimir el asunto.
+- **Detalle** — vista de incidencia a dos columnas: a la izquierda lo que se lee,
+  a la derecha lo que se opera. El **estado es un menú de transiciones legales**
+  (ADR-0015), que es donde ese cálculo se luce.
+- **Avisos** (`components/ui/toast.tsx`) — las mutaciones confirman. El error va
+  con `priority: 'high'` y sin cierre automático: un fallo que se desvanece solo
+  es un fallo que nadie leyó.
+- **`cambiosRecientes` en `ws-provider`** — lo que llega por el socket sigue sin
+  pintarse (solo invalida), pero ahora se anota QUÉ ticket cambió para que la
+  fila dé un destello. Un cambio que ocurre donde nadie mira, se pierde.
+- **Sin barra de progreso en el SLA**, a propósito: dibujar lo consumido exige
+  saber cuándo arrancó el reloj, y el DTO no lo trae. Deducirlo de
+  `dueAt - createdAt` se rompe en cuanto un reloj se pause.
+
+### Gotcha que costó el build
+
+**Por la frontera servidor/cliente solo cruzan componentes con nombre.**
+`providers/index.tsx` NO lleva `'use client'`, así que es un componente de
+servidor. Reexportar el *namespace* `TooltipPrimitive` desde un módulo de cliente
+lo convirtió en una referencia opaca, y `TooltipPrimitive.Provider` llegó como
+`undefined`: "Element type is invalid" en TODAS las rutas, aunque el build solo
+señalaba `/settings/sla` (falla en la primera que prerenderiza). La salida es
+exportar un `TooltipProvider` propio.
 
 ## Comandos
 

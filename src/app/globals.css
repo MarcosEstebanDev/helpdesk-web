@@ -4,12 +4,48 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+  Paleta tomada del Atlassian Design System. Los valores van en hex y con el
+  nombre del token de ADS al lado a propósito: es la referencia con la que se
+  contrasta, y un hex se compara de un vistazo contra la documentación.
+
+  Dos cosas que definen el aspecto y que conviene no "arreglar" sin pensarlo:
+  - **El texto no es negro**, es `N800 #172B4D`, un azul-tinta. Es la mitad de
+    por qué esto se lee como Jira y no como un gris genérico.
+  - **El radio es chico** (4px). Atlassian es notoriamente cuadrado; los radios
+    grandes empujan la interfaz hacia "landing page" y la alejan de "herramienta".
+*/
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-inter);
+
+  /* Cromo de la aplicación: barra superior y navegación lateral. Son tokens
+     propios y no `card`/`muted` para que el marco se pueda cambiar entero
+     (a la barra azul marino del Jira clásico, por ejemplo) sin tocar el
+     contenido. */
+  --color-shell: var(--shell);
+  --color-shell-foreground: var(--shell-foreground);
+  --color-shell-muted: var(--shell-muted);
+  --color-shell-border: var(--shell-border);
+  --color-shell-hover: var(--shell-hover);
+
+  /* Estados. No existían: los lozenges tenían que tirar de `emerald-500` y
+     `amber-500` crudos de Tailwind, que no responden al tema. */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-progress: var(--progress);
+  --color-progress-foreground: var(--progress-foreground);
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,6 +75,11 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  /* Señal de "esto acaba de cambiar solo": un destello que se apaga. Es la
+     única animación no disparada por el usuario en toda la aplicación, y existe
+     porque el cambio llega por WebSocket cuando nadie estaba mirando esa fila. */
+  --animate-destello: destello 1.4s ease-out;
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -49,72 +90,116 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #f7f8f9; /* N10 */
+  --foreground: #172b4d; /* N800 */
+  --card: #ffffff; /* N0 */
+  --card-foreground: #172b4d;
+  --popover: #ffffff;
+  --popover-foreground: #172b4d;
+  --primary: #0c66e4; /* B400 */
+  --primary-foreground: #ffffff;
+  --secondary: #f1f2f4; /* N20 */
+  --secondary-foreground: #172b4d;
+  --muted: #f1f2f4;
+  --muted-foreground: #626f86; /* N500 — el "subtle text" de ADS */
+  --accent: #e9f2ff; /* B50 */
+  --accent-foreground: #0055cc; /* B700 */
+  --destructive: #c9372c; /* R500 */
+  --border: #dcdfe4; /* N40 */
+  --input: #dcdfe4;
+  --ring: #388bff; /* B300 */
+
+  --shell: #ffffff;
+  --shell-foreground: #172b4d;
+  --shell-muted: #626f86;
+  --shell-border: #dcdfe4;
+  --shell-hover: #f1f2f4;
+
+  --success: #dcfff1; /* G50 */
+  --success-foreground: #216e4e; /* G800 */
+  --warning: #fff7d6; /* Y50 */
+  --warning-foreground: #7f5f01; /* Y800 */
+  --info: #e9f2ff; /* B50 */
+  --info-foreground: #0055cc; /* B700 */
+  --danger: #ffecea; /* R50 */
+  --danger-foreground: #ae2e24; /* R800 */
+  --progress: #e9f2ff;
+  --progress-foreground: #0c66e4;
+
+  --radius: 0.25rem;
+  --sidebar: #f7f8f9;
+  --sidebar-foreground: #172b4d;
+  --sidebar-primary: #0c66e4;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e9f2ff;
+  --sidebar-accent-foreground: #0055cc;
+  --sidebar-border: #dcdfe4;
+  --sidebar-ring: #388bff;
+
+  --chart-1: #0c66e4;
+  --chart-2: #1f845a;
+  --chart-3: #e2b203;
+  --chart-4: #c9372c;
+  --chart-5: #5e4db2;
 }
 
+/*
+  Modo oscuro de ADS. No es el claro invertido: las superficies suben de tono
+  con la elevación (fondo #161A1D, tarjeta #1D2125) en vez de bajar, y el azul
+  se aclara a B400-dark #579DFF porque el B400 del claro no llega al contraste
+  mínimo sobre fondo oscuro.
+*/
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #161a1d;
+  --foreground: #c7d1db;
+  --card: #1d2125;
+  --card-foreground: #c7d1db;
+  --popover: #22272b;
+  --popover-foreground: #c7d1db;
+  --primary: #579dff; /* B400 (dark) */
+  --primary-foreground: #1d2125;
+  --secondary: #22272b;
+  --secondary-foreground: #c7d1db;
+  --muted: #22272b;
+  --muted-foreground: #9fadbc; /* DN subtle text */
+  --accent: #1c2b41;
+  --accent-foreground: #85b8ff;
+  --destructive: #f87168;
+  --border: #2c333a;
+  --input: #38414a;
+  --ring: #388bff;
+
+  --shell: #1d2125;
+  --shell-foreground: #c7d1db;
+  --shell-muted: #9fadbc;
+  --shell-border: #2c333a;
+  --shell-hover: #2c333a;
+
+  --success: #1c3329;
+  --success-foreground: #7ee2b8;
+  --warning: #332e1b;
+  --warning-foreground: #f5cd47;
+  --info: #1c2b41;
+  --info-foreground: #85b8ff;
+  --danger: #42221f;
+  --danger-foreground: #fd9891;
+  --progress: #22272b;
+  --progress-foreground: #579dff;
+
+  --sidebar: #1d2125;
+  --sidebar-foreground: #c7d1db;
+  --sidebar-primary: #579dff;
+  --sidebar-primary-foreground: #1d2125;
+  --sidebar-accent: #1c2b41;
+  --sidebar-accent-foreground: #85b8ff;
+  --sidebar-border: #2c333a;
+  --sidebar-ring: #388bff;
+
+  --chart-1: #579dff;
+  --chart-2: #7ee2b8;
+  --chart-3: #f5cd47;
+  --chart-4: #fd9891;
+  --chart-5: #9f8fef;
 }
 
 @layer base {
@@ -126,5 +211,31 @@
   }
   html {
     @apply font-sans;
+    /* Inter con las cifras a ancho fijo: sin esto, un contador que pasa de
+       "hace 9 min" a "hace 10 min" mueve todo lo que tiene al lado. */
+    font-variant-numeric: tabular-nums;
+  }
+  /* El foco visible es parte del suelo de calidad, no una opción: toda la
+     aplicación se puede operar con teclado y tiene que verse dónde está uno. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@keyframes destello {
+  from {
+    background-color: var(--accent);
+  }
+  to {
+    background-color: transparent;
   }
 }
