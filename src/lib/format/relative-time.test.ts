@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fechaAbsoluta, tiempoRelativo } from './relative-time';
+import { fechaAbsoluta, fechaCorta, tiempoRelativo } from './relative-time';
 
 const AHORA = new Date('2026-09-10T12:00:00Z');
 
@@ -33,6 +33,16 @@ describe('tiempoRelativo', () => {
   // creado "en el futuro" no debe pintarse como "hace -3 min".
   it('no inventa futuro cuando el reloj del cliente va atrasado', () => {
     expect(tiempoRelativo('2026-09-10T12:03:00Z', AHORA)).toBe('ahora');
+  });
+});
+
+describe('fechaCorta', () => {
+  // Se comprueba la FORMA y no el texto: el resultado depende de la zona
+  // horaria de quien corre el test, y clavarlo a una haría fallar el CI.
+  it('da día, mes abreviado y hora, sin año', () => {
+    expect(fechaCorta('2026-09-10T12:00:00Z')).toMatch(
+      /^\d{1,2} [a-zé]{3,4},? \d{1,2}:\d{2}$/,
+    );
   });
 });
 

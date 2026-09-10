@@ -33,6 +33,22 @@ export function tiempoRelativo(iso: string, ahora: Date = new Date()): string {
   }).format(fecha);
 }
 
+/**
+ * Fecha corta con hora: "10 sep, 18:55".
+ *
+ * Para los vencimientos de SLA, donde la fecha completa ("10 de septiembre de
+ * 2026 a las 18:55") ocupaba tres renglones en el panel lateral y tapaba el
+ * dato que de verdad importa, que es cuánto margen queda.
+ */
+export function fechaCorta(iso: string): string {
+  return new Intl.DateTimeFormat('es', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso));
+}
+
 /** Fecha y hora completas, para el tooltip de un tiempo relativo. */
 export function fechaAbsoluta(iso: string): string {
   return new Intl.DateTimeFormat('es', {

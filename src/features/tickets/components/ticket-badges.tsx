@@ -5,8 +5,13 @@ import { fechaAbsoluta, tiempoRelativo } from '@/lib/format/relative-time';
 import { cn } from '@/lib/utils';
 import type { TicketPriority, TicketStatus } from '@/lib/api/types';
 
+// Cuatro estados, cuatro señales distintas. `OPEN` es GRIS a propósito: es el
+// estado de reposo, y pintarlo del mismo azul que `IN_PROGRESS` hacía que el
+// color no distinguiera nada justo donde tiene que distinguir — "nadie lo tocó"
+// de "alguien lo está trabajando". `CLOSED` se separa por forma (contorno sin
+// relleno) en vez de por un quinto tono.
 const ESTADO_TONO = {
-  OPEN: 'info',
+  OPEN: 'neutral',
   IN_PROGRESS: 'progress',
   RESOLVED: 'success',
   CLOSED: 'closed',

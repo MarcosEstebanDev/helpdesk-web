@@ -110,11 +110,11 @@ export default function TicketDetailPage() {
             {ticket.subject}
           </h1>
 
-          <Card className="p-4">
-            <p className="text-sm leading-6 whitespace-pre-wrap">
-              {ticket.description}
-            </p>
-          </Card>
+          {/* Sin tarjeta: la descripción es prosa, y encerrarla en un borde la
+              hace parecer un campo de formulario deshabilitado. */}
+          <p className="max-w-prose text-sm leading-6 whitespace-pre-wrap">
+            {ticket.description}
+          </p>
 
           <section className="space-y-3">
             <h2 className="text-sm font-semibold">

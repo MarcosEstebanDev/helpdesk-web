@@ -1,5 +1,5 @@
 import { Card } from '@/components/ui/primitives';
-import { fechaAbsoluta } from '@/lib/format/relative-time';
+import { fechaCorta } from '@/lib/format/relative-time';
 import { cn } from '@/lib/utils';
 import type { TicketSla } from '@/lib/api/types';
 
@@ -53,7 +53,7 @@ export function SlaPanel({ sla }: { sla: TicketSla[] }) {
               <SlaEstado reloj={reloj} />
             </p>
             <p className="text-xs text-muted-foreground" suppressHydrationWarning>
-              vence {fechaAbsoluta(reloj.dueAt)}
+              vence {fechaCorta(reloj.dueAt)}
             </p>
           </div>
         </div>
