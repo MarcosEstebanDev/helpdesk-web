@@ -16,6 +16,12 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 # ---- build: compila Next -> .next/standalone ----
 FROM base AS build
 ENV NEXT_TELEMETRY_DISABLED=1
+# La URL de la API se fija AQUI, no al arrancar el contenedor: Next sustituye
+# las `NEXT_PUBLIC_*` estaticamente durante el build (por eso `lib/env.ts` las
+# referencia por nombre completo). Pasarla como variable de runtime no tendria
+# ningun efecto sobre el bundle que llega al navegador.
+ARG NEXT_PUBLIC_API_URL=http://localhost:3000
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm build

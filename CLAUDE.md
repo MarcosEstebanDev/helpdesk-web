@@ -164,3 +164,20 @@ pnpm build
 
 Igual que en el backend: proponer estructura y decisiones, **esperar OK antes de
 generar código**, documentar el porqué, y responder siempre en **español**.
+
+## Fase 10 (docs) — 2026-09-10
+
+- **README reescrito en INGLES** (decision del usuario: el README es el
+  escaparate y lo leen hiring managers; los ADRs del api siguen en espanol).
+  Cubre las decisiones propias del cliente: token en memoria, por que la guarda
+  de ruta es de CLIENTE y no middleware, invalidar cache en vez de pintar el
+  payload, socket atado al ciclo de vida del token. Y su deuda conocida.
+- **`LICENSE` (MIT)** anadido; no habia.
+- **`Dockerfile`: `NEXT_PUBLIC_API_URL` pasa a ser `ARG`.** Next sustituye las
+  `NEXT_PUBLIC_*` ESTATICAMENTE durante el build, asi que el `docker run -e ...`
+  que documentaba el README anterior no tenia ningun efecto sobre el bundle que
+  llega al navegador. Verificado grepeando el chunk generado.
+- Este repo se levanta junto al backend con
+  `docker compose -f ../helpdesk-api/infra/docker-compose.demo.yml up --build`
+  (web en :3001, api en :3000, con datos de demo ya sembrados).
+- Verificado: 36/36 tests, typecheck y build en verde.
