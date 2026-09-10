@@ -16,9 +16,12 @@ público, o sea el único que un reclutador puede abrir. Lo que NO cambió es la
 regla de fondo: **no se inventa nada que la API no diga** — sin nombres de
 usuario falsos, sin barras de progreso deducidas, sin estados adivinados.
 
-- Repo backend (separado, ADR-0001): `helpdesk-api` — **PRIVADO**.
+- Repo backend (separado, ADR-0001): `helpdesk-api` — también **PÚBLICO**
+  (verificado el 2026-09-10; antes acá decía que era privado y estaba mal).
 - **Este repo es PÚBLICO**: https://github.com/MarcosEstebanDev/helpdesk-web
-  Ojo con lo que se commitea.
+  Ojo con lo que se commitea, en los dos.
+- **Ramas:** `main` es producción, `dev` es integración. Las features salen de
+  `dev` y vuelven a `dev`.
 
 ## Stack
 
