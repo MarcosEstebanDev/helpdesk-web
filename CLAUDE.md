@@ -98,7 +98,7 @@ AGENT/ADMIN cambiar estado y asignar.
   esté montado, con recuento por si dos componentes miran el mismo.
 - `lib/query/keys.ts` — claves canónicas, compartidas por queries y realtime.
 
-**Tests (Vitest + Testing Library).** 50 tests junto al código (`*.test.ts[x]`),
+**Tests (Vitest + Testing Library).** 73 tests junto al código (`*.test.ts[x]`),
 sobre lo que tiene lógica de verdad y no sobre el marcado:
 - `lib/api/client.test.ts` — el token se lee en CADA llamada (si se capturara al
   importar, todo daría 401 tras el primer refresh), `credentials: 'include'`
@@ -146,8 +146,12 @@ comentarios, transición inválida, sla-policy y refresh).
   refresh el usuario queda con el email vacío. Se rellena al hacer login.
 - No hay pantalla de invitación de miembros ni de gestión de roles (el backend
   tampoco los expone).
-- El rastro de auditoría (`GET /tickets/:id/history`) tiene su hook
-  (`useTicketHistory`) pero ninguna pantalla lo usa todavía.
+- **La variante VIEWER de "Mis tickets" espera al backend.** El filtro actual es
+  por `assigneeId`, y a un VIEWER no se le puede asignar nada; el suyo sería
+  "los que abrí yo", que necesita un `requesterId` que `GET /tickets` todavía no
+  acepta. Cuando exista, entra en `features/tickets/filters.ts`.
+- Sigue sin haber selector de personas para asignar: hace falta un `GET /members`
+  en el backend.
 
 ## Capa de UI (2026-09-10)
 
@@ -184,6 +188,45 @@ Sin dependencias nuevas: `@base-ui/react` ya estaba y trae `toast`, `tooltip`,
 - **Sin barra de progreso en el SLA**, a propósito: dibujar lo consumido exige
   saber cuándo arrancó el reloj, y el DTO no lo trae. Deducirlo de
   `dueAt - createdAt` se rompe en cuanto un reloj se pause.
+
+### Añadido el 2026-09-10 (rama `feat/pendientes-front`)
+
+- **Límites de error en TRES niveles**, y no uno, porque un `error.tsx` **no
+  atrapa los errores del `layout.tsx` de su propio segmento**: los sube al padre.
+  La guarda de sesión vive en `(app)/layout.tsx`, así que si revienta ahí, el
+  límite de `(app)` no se entera — ese hueco lo cubre `app/error.tsx`. Y si cae
+  el layout raíz no queda documento: de eso se ocupa `global-error.tsx`, con sus
+  propios `<html>`, `<body>` y estilos, navegando con `<a>` porque sin árbol de
+  React no hay router. El `not-found.tsx` va en la RAÍZ y no dentro de `(app)`:
+  detrás de la guarda mandaría al login a quien escribió mal una dirección.
+  Ninguno pinta `error.message` (Next lo redacta en producción); se muestra el
+  `digest`, que es lo único que cruza con los logs.
+- **El prop de reintento de Next 16 se llama `unstable_retry`.** No se usa: se
+  hace `reset()` más un `router.refresh()` propio, que es lo mismo sin atar el
+  repo a una API inestable.
+- **Filtro "Mis tickets"** con los filtros armados en una función pura
+  (`features/tickets/filters.ts`) porque ese objeto ES la clave de caché de
+  TanStack Query: una clave que no aplica se OMITE en vez de ponerse en
+  `undefined` (`{}` y `{status: undefined}` hashean distinto). Va como `type` y
+  no como `interface` porque `ticketKeys.list()` pide un `Record<string,
+  unknown>` y solo los alias de tipo tienen firma de índice implícita.
+- **Pestañas de actividad** (`ticket-activity.tsx`), con la conversación extraída
+  a `ticket-comments.tsx`. **`keepMounted` en el panel de comentarios no es una
+  optimización**: Base UI desmonta el panel inactivo y el textarea de respuesta
+  vive ahí — sin eso, mirar el historial a media respuesta borra el borrador.
+- **`features/tickets/audit.ts` es lógica pura y devuelve datos, no JSX.** La
+  decisión difícil no es cómo se pinta sino qué se puede afirmar: `metadata` es
+  `unknown`, así que cada campo se lee con una guarda y **lo que no se pueda leer
+  no se muestra**. Un cambio de estado sin `from`/`to` legibles se cuenta a
+  secas, nunca con una transición supuesta. `ticket.priority_changed` va sin
+  detalle a propósito: está en el enum del backend pero ningún caso de uso la
+  emite, así que su metadata sería una invención. Las acciones desconocidas se
+  muestran crudas — el contrato se mantiene a ojo y una acción nueva llega sin
+  avisar.
+- El historial se pide **solo al abrir su pestaña** y `useTicketHistory` **no
+  reintenta los 4xx** (el default `retry: 1` disparaba dos peticiones contra el
+  mismo 403). No hizo falta tocar `ws-provider`: `ticketKeys.history` cuelga de
+  `ticketKeys.detail`, así que la invalidación existente ya lo alcanza.
 
 ### Gotcha que costó el build
 

@@ -4,25 +4,24 @@ import { Menu } from '@base-ui/react/menu';
 import { ChevronDown, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Avatar,
   Card,
   ErrorText,
   Skeleton,
-  Textarea,
 } from '@/components/ui/primitives';
 import { useAvisos } from '@/components/ui/toast';
 import { useSession } from '@/features/auth/session';
 import { SlaPanel } from '@/features/tickets/components/sla-panel';
+import { TicketActivity } from '@/features/tickets/components/ticket-activity';
 import {
   FechaRelativa,
   PriorityLabel,
   StatusBadge,
 } from '@/features/tickets/components/ticket-badges';
 import {
-  useAddComment,
   useAssignment,
   useChangeStatus,
   useTicket,
@@ -32,7 +31,6 @@ import { useTicketWatch } from '@/lib/realtime/use-ticket-watch';
 import { cn } from '@/lib/utils';
 import {
   ALLOWED_TRANSITIONS,
-  type TicketComment,
   type TicketDetail,
   type TicketStatus,
 } from '@/lib/api/types';
@@ -116,15 +114,7 @@ export default function TicketDetailPage() {
             {ticket.description}
           </p>
 
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold">
-              Actividad{' '}
-              <span className="font-normal text-muted-foreground">
-                ({ticket.comments.length})
-              </span>
-            </h2>
-            <Conversacion ticket={ticket} />
-          </section>
+          <TicketActivity ticket={ticket} />
         </div>
 
         <aside className="space-y-3 lg:sticky lg:top-16 lg:self-start">
@@ -342,121 +332,6 @@ function Asignacion({
         </Button>
       ) : null}
     </span>
-  );
-}
-
-function Conversacion({ ticket }: { ticket: TicketDetail }) {
-  const [texto, setTexto] = useState('');
-  const avisos = useAvisos();
-  const comentar = useAddComment(ticket.id);
-  const cerrado = ticket.status === 'CLOSED';
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    const cuerpo = texto.trim();
-    if (cuerpo === '') return;
-    comentar.mutate(cuerpo, {
-      onSuccess: () => setTexto(''),
-      onError: (e) =>
-        avisos.error(
-          'No se pudo enviar la respuesta',
-          e instanceof ApiError ? e.message : undefined,
-        ),
-    });
-  }
-
-  return (
-    <div className="space-y-4">
-      {ticket.comments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Todavía no hay respuestas.
-        </p>
-      ) : (
-        <ol className="space-y-4">
-          {ticket.comments.map((comentario) => (
-            <Comentario
-              key={comentario.id}
-              comentario={comentario}
-              ticket={ticket}
-            />
-          ))}
-        </ol>
-      )}
-
-      {cerrado ? (
-        <p className="rounded-lg border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground">
-          El ticket está cerrado. Reabrilo para seguir la conversación.
-        </p>
-      ) : (
-        <form onSubmit={onSubmit} className="space-y-2">
-          <Textarea
-            rows={3}
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            placeholder="Escribí una respuesta…"
-            aria-label="Respuesta"
-          />
-          <Button
-            type="submit"
-            size="sm"
-            disabled={comentar.isPending || texto.trim() === ''}
-          >
-            {comentar.isPending ? 'Enviando…' : 'Responder'}
-          </Button>
-        </form>
-      )}
-    </div>
-  );
-}
-
-/**
- * Un mensaje del hilo.
- *
- * De un comentario solo llega `authorId`: la API no expone nombres ni un
- * endpoint de miembros. En vez de inventar iniciales, se dice el papel que esa
- * persona tiene en ESTE ticket, que se deduce de datos que sí existen — es quien
- * lo abrió, es quien lo tiene asignado, o sos vos.
- */
-function Comentario({
-  comentario,
-  ticket,
-}: {
-  comentario: TicketComment;
-  ticket: TicketDetail;
-}) {
-  const { user } = useSession();
-  const esMio = comentario.authorId === user?.id;
-
-  const papel = esMio
-    ? 'Vos'
-    : comentario.authorId === ticket.requesterId
-      ? 'Solicitante'
-      : comentario.authorId === ticket.assigneeId
-        ? 'Agente asignado'
-        : 'Agente';
-
-  return (
-    <li className="flex gap-2.5">
-      <Avatar variante={esMio ? 'vos' : 'otro'} aria-hidden />
-      <div className="min-w-0 flex-1">
-        <p className="flex items-baseline gap-2 text-xs">
-          <span className="font-semibold text-foreground">{papel}</span>
-          <span className="text-muted-foreground">
-            <FechaRelativa iso={comentario.createdAt} />
-          </span>
-        </p>
-        <div
-          className={cn(
-            'mt-1 rounded-lg border border-border bg-card px-3 py-2',
-            esMio && 'border-accent bg-accent/40',
-          )}
-        >
-          <p className="text-sm leading-6 whitespace-pre-wrap">
-            {comentario.body}
-          </p>
-        </div>
-      </div>
-    </li>
   );
 }
 

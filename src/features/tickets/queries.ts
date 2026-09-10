@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-query';
 import * as api from '@/features/tickets/api';
 import type { FiltrosDeBandeja } from '@/features/tickets/filters';
+import { ApiError } from '@/lib/api/client';
 import { ticketKeys } from '@/lib/query/keys';
 import type { TicketPriority, TicketStatus } from '@/lib/api/types';
 
@@ -47,6 +48,11 @@ export function useTicketHistory(ticketId: string, habilitado: boolean) {
     queryKey: ticketKeys.history(ticketId),
     queryFn: () => api.getHistory(ticketId),
     enabled: habilitado,
+    // No se reintentan los 4xx. El default de TanStack Query es `retry: 1`, así
+    // que un 403 —rol cambiado, sesión vieja— dispararía dos peticiones contra
+    // el mismo "no". Los 5xx sí se reintentan: ahí el retry sirve para algo.
+    retry: (intentos, error) =>
+      !(error instanceof ApiError && error.status < 500) && intentos < 1,
   });
 }
 
