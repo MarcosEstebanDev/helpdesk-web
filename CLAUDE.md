@@ -7,8 +7,14 @@
 ## Qué es
 
 Frontend del SaaS de **helpdesk multi-tenant y event-driven**. Proyecto de
-portfolio fullstack senior con **foco backend**: aquí el objetivo no es lucir UI,
-sino consumir bien un backend event-driven y no contradecir sus decisiones.
+portfolio fullstack senior con **foco backend**: lo primero es consumir bien un
+backend event-driven y no contradecir sus decisiones.
+
+Dicho eso, **la interfaz sí importa**, y desde 2026-09-10 tiene un lenguaje
+visual propio (ver "Capa de UI"): este es el único de los dos repos que es
+público, o sea el único que un reclutador puede abrir. Lo que NO cambió es la
+regla de fondo: **no se inventa nada que la API no diga** — sin nombres de
+usuario falsos, sin barras de progreso deducidas, sin estados adivinados.
 
 - Repo backend (separado, ADR-0001): `helpdesk-api` — **PRIVADO**.
 - **Este repo es PÚBLICO**: https://github.com/MarcosEstebanDev/helpdesk-web
@@ -92,7 +98,7 @@ AGENT/ADMIN cambiar estado y asignar.
   esté montado, con recuento por si dos componentes miran el mismo.
 - `lib/query/keys.ts` — claves canónicas, compartidas por queries y realtime.
 
-**Tests (Vitest + Testing Library).** 36 tests junto al código (`*.test.ts[x]`),
+**Tests (Vitest + Testing Library).** 73 tests junto al código (`*.test.ts[x]`),
 sobre lo que tiene lógica de verdad y no sobre el marcado:
 - `lib/api/client.test.ts` — el token se lee en CADA llamada (si se capturara al
   importar, todo daría 401 tras el primer refresh), `credentials: 'include'`
@@ -140,8 +146,118 @@ comentarios, transición inválida, sla-policy y refresh).
   refresh el usuario queda con el email vacío. Se rellena al hacer login.
 - No hay pantalla de invitación de miembros ni de gestión de roles (el backend
   tampoco los expone).
-- El rastro de auditoría (`GET /tickets/:id/history`) tiene su hook
-  (`useTicketHistory`) pero ninguna pantalla lo usa todavía.
+- **El front ya consume `GET /members` y `requesterId`, pero el backend los trae
+  la rama `feat/members-endpoint` de `helpdesk-api`, sin mergear.** Hasta que se
+  integre, el selector de personas responde 403 y el filtro del VIEWER devuelve
+  400 contra la API vieja. Las dos ramas entran juntas.
+- Los nombres en la conversación **solo los ve un AGENT**: `GET /members` responde
+  403 a un VIEWER a propósito. Para el cliente final se sigue diciendo el papel.
+  La salida acordada es enriquecer `GET /tickets/:id` con los participantes de
+  ESE ticket; sigue pendiente.
+
+## Capa de UI (2026-09-10)
+
+Lenguaje visual tomado del **Atlassian Design System**, a pedido del usuario.
+Sin dependencias nuevas: `@base-ui/react` ya estaba y trae `toast`, `tooltip`,
+`dialog` y `menu`.
+
+- **`globals.css`** — paleta de ADS en hex, con el nombre del token al lado
+  (`#172B4D` = N800, `#0C66E4` = B400). Dos cosas que no hay que "arreglar":
+  el texto **no es negro** sino azul-tinta, y el radio es de 4px porque
+  Atlassian es cuadrado. Tokens nuevos `--success` / `--warning` / `--info` /
+  `--danger` y los de cromo `--shell-*`: antes los badges tiraban de
+  `emerald-500` y `amber-500` crudos, que no responden al tema.
+- **Tema claro/oscuro a mano** (`providers/theme-provider.tsx` + `lib/theme.ts`).
+  Sin `next-themes`. Dos detalles que cuestan si se tocan: el script síncrono
+  del `<head>` (`guionAntiParpadeo`) evita el fogonazo blanco, y la preferencia
+  se lee con `useSyncExternalStore`, no con un `setState` en un efecto, que la
+  regla `react-hooks/set-state-in-effect` prohíbe.
+- **Marco** (`(app)/layout.tsx`) — barra superior fija + navegación lateral, que
+  en móvil pasa a panel. El panel se cierra en el `onClick` de cada enlace, no
+  con un efecto sobre el pathname (misma regla de ESLint).
+- **Bandeja** — anatomía de backlog: flecha de prioridad, `#número` en mono,
+  asunto, asignación, lozenge de estado y tiempo relativo. Bajo `sm` los
+  metadatos caen a una segunda línea en vez de comprimir el asunto.
+- **Detalle** — vista de incidencia a dos columnas: a la izquierda lo que se lee,
+  a la derecha lo que se opera. El **estado es un menú de transiciones legales**
+  (ADR-0015), que es donde ese cálculo se luce.
+- **Avisos** (`components/ui/toast.tsx`) — las mutaciones confirman. El error va
+  con `priority: 'high'` y sin cierre automático: un fallo que se desvanece solo
+  es un fallo que nadie leyó.
+- **`cambiosRecientes` en `ws-provider`** — lo que llega por el socket sigue sin
+  pintarse (solo invalida), pero ahora se anota QUÉ ticket cambió para que la
+  fila dé un destello. Un cambio que ocurre donde nadie mira, se pierde.
+- **Sin barra de progreso en el SLA**, a propósito: dibujar lo consumido exige
+  saber cuándo arrancó el reloj, y el DTO no lo trae. Deducirlo de
+  `dueAt - createdAt` se rompe en cuanto un reloj se pause.
+
+### Añadido el 2026-09-10 (rama `feat/pendientes-front`)
+
+- **Límites de error en TRES niveles**, y no uno, porque un `error.tsx` **no
+  atrapa los errores del `layout.tsx` de su propio segmento**: los sube al padre.
+  La guarda de sesión vive en `(app)/layout.tsx`, así que si revienta ahí, el
+  límite de `(app)` no se entera — ese hueco lo cubre `app/error.tsx`. Y si cae
+  el layout raíz no queda documento: de eso se ocupa `global-error.tsx`, con sus
+  propios `<html>`, `<body>` y estilos, navegando con `<a>` porque sin árbol de
+  React no hay router. El `not-found.tsx` va en la RAÍZ y no dentro de `(app)`:
+  detrás de la guarda mandaría al login a quien escribió mal una dirección.
+  Ninguno pinta `error.message` (Next lo redacta en producción); se muestra el
+  `digest`, que es lo único que cruza con los logs.
+- **El prop de reintento de Next 16 se llama `unstable_retry`.** No se usa: se
+  hace `reset()` más un `router.refresh()` propio, que es lo mismo sin atar el
+  repo a una API inestable.
+- **Filtro "Mis tickets"** con los filtros armados en una función pura
+  (`features/tickets/filters.ts`) porque ese objeto ES la clave de caché de
+  TanStack Query: una clave que no aplica se OMITE en vez de ponerse en
+  `undefined` (`{}` y `{status: undefined}` hashean distinto). Va como `type` y
+  no como `interface` porque `ticketKeys.list()` pide un `Record<string,
+  unknown>` y solo los alias de tipo tienen firma de índice implícita.
+- **Pestañas de actividad** (`ticket-activity.tsx`), con la conversación extraída
+  a `ticket-comments.tsx`. **`keepMounted` en el panel de comentarios no es una
+  optimización**: Base UI desmonta el panel inactivo y el textarea de respuesta
+  vive ahí — sin eso, mirar el historial a media respuesta borra el borrador.
+- **`features/tickets/audit.ts` es lógica pura y devuelve datos, no JSX.** La
+  decisión difícil no es cómo se pinta sino qué se puede afirmar: `metadata` es
+  `unknown`, así que cada campo se lee con una guarda y **lo que no se pueda leer
+  no se muestra**. Un cambio de estado sin `from`/`to` legibles se cuenta a
+  secas, nunca con una transición supuesta. `ticket.priority_changed` va sin
+  detalle a propósito: está en el enum del backend pero ningún caso de uso la
+  emite, así que su metadata sería una invención. Las acciones desconocidas se
+  muestran crudas — el contrato se mantiene a ojo y una acción nueva llega sin
+  avisar.
+- El historial se pide **solo al abrir su pestaña** y `useTicketHistory` **no
+  reintenta los 4xx** (el default `retry: 1` disparaba dos peticiones contra el
+  mismo 403). No hizo falta tocar `ws-provider`: `ticketKeys.history` cuelga de
+  `ticketKeys.detail`, así que la invalidación existente ya lo alcanza.
+
+### Directorio de miembros (2026-09-10)
+
+- **`features/members/`** — `GET /members` con `staleTime` de 5 minutos y clave
+  compartida: se pide una vez para toda la aplicación, no una por ticket abierto.
+  Como el historial, **no reintenta los 4xx**.
+- **`crearDirectorio()` devuelve `null` cuando no conoce a alguien**, y quien
+  llama decide con qué rellenar. Es la pieza que mantiene la regla del repo: un
+  VIEWER no tiene directorio (403) y un agente dado de baja no está en la lista
+  aunque siga en la auditoría, así que en los dos casos se cae al papel
+  ("Solicitante", "Agente asignado") en vez de inventar un nombre.
+- **El selector de asignación muestra el ROL de cada persona.** No es decoración:
+  el backend deja asignarle un ticket a cualquier miembro (`isMember` no mira el
+  rol) mientras el reparto automático solo elige entre AGENT y ADMIN. Se decidió
+  no endurecer la regla de negocio y hacer visible lo que se está haciendo.
+- **"Míos" significa dos cosas y por eso son dos campos.** Un agente quiere lo
+  que le toca (`assigneeId`); un VIEWER no puede tener nada asignado y quiere lo
+  que abrió (`requesterId`). La traducción vive en `filtrosDeBandeja`, y el botón
+  cambia de etiqueta para decir lo que de verdad hace.
+
+### Gotcha que costó el build
+
+**Por la frontera servidor/cliente solo cruzan componentes con nombre.**
+`providers/index.tsx` NO lleva `'use client'`, así que es un componente de
+servidor. Reexportar el *namespace* `TooltipPrimitive` desde un módulo de cliente
+lo convirtió en una referencia opaca, y `TooltipPrimitive.Provider` llegó como
+`undefined`: "Element type is invalid" en TODAS las rutas, aunque el build solo
+señalaba `/settings/sla` (falla en la primera que prerenderiza). La salida es
+exportar un `TooltipProvider` propio.
 
 ## Comandos
 

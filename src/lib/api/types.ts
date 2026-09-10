@@ -45,6 +45,32 @@ export interface MeResponse {
   userId: string;
   tenantId: string;
   role: Role;
+  /** Se lee de la base en el backend; no viaja en el token. */
+  email: string;
+}
+
+// ---------------------------------------------------------------- miembros
+
+/**
+ * Un miembro de la organización (`GET /members`, ADR-0025 del backend).
+ *
+ * **Solo lo puede pedir un AGENT o superior.** Un VIEWER es el cliente final, y
+ * el listado de empleados en sus manos sería una lista de correos cosechable: la
+ * interfaz no debe ofrecerle nada que dependa de esto.
+ *
+ * `userId` y no `id`: es el valor que piden `assigneeId`, `requesterId` y
+ * `authorId`. Y la etiqueta legible es el **email**, porque el backend no tiene
+ * columna `name`.
+ */
+export interface Member {
+  userId: string;
+  email: string;
+  role: Role;
+  joinedAt: string;
+}
+
+export interface MemberList {
+  items: Member[];
 }
 
 // ---------------------------------------------------------------- tickets
@@ -100,9 +126,40 @@ export interface TicketPage {
   nextCursor: string | null;
 }
 
+/**
+ * Acciones del rastro de auditoría, espejadas a mano desde `AUDIT_ACTIONS` del
+ * backend. Como todo `types.ts`, esto NO lo genera nadie: si allá aparece una
+ * acción nueva, acá no rompe la compilación — llega como una cadena que no está
+ * en la lista. Por eso `describirEntrada` tiene un caso por defecto que la
+ * muestra tal cual en vez de tragársela.
+ */
+export const AUDIT_ACTIONS = [
+  'ticket.created',
+  'ticket.assigned',
+  'ticket.unassigned',
+  'ticket.status_changed',
+  'ticket.priority_changed',
+  'comment.added',
+  'sla.breached',
+  'sla.policy_changed',
+] as const;
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
+/**
+ * UUID reservado para las acciones que no hizo una persona (ADR-0019).
+ *
+ * `audit_logs.actor_id` no tiene clave foránea a `users` justamente para que la
+ * auditoría sobreviva al borrado de lo que audita; el backend aprovecha esa
+ * propiedad para tener un actor que no es un usuario. Que estos ceros
+ * signifiquen "el sistema" es una convención documentada, no una deducción.
+ */
+export const SYSTEM_ACTOR_ID = '00000000-0000-0000-0000-000000000000';
+
 export interface AuditEntry {
   id: string;
   actorId: string;
+  /** Una de `AUDIT_ACTIONS`, pero se tipa ancho a propósito: el contrato se
+      mantiene a ojo y el backend puede sumar acciones sin avisar. */
   action: string;
   metadata: unknown;
   occurredAt: string;
