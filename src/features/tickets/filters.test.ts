@@ -9,14 +9,14 @@ describe('filtrosDeBandeja', () => {
   // la bandeja antes de que existiera este filtro. Si no, quien ya tenía la
   // lista cargada la vuelve a pedir sin motivo.
   it('sin filtros devuelve el objeto vacío, que es la clave de caché de "todos"', () => {
-    expect(filtrosDeBandeja({ estado: '', soloMios: false, miId: MI_ID })).toEqual(
+    expect(filtrosDeBandeja({ estado: '', soloMios: false, miId: MI_ID, esAgente: true })).toEqual(
       {},
     );
   });
 
   it('el estado y "mis tickets" se combinan en un solo filtro', () => {
     expect(
-      filtrosDeBandeja({ estado: 'OPEN', soloMios: true, miId: MI_ID }),
+      filtrosDeBandeja({ estado: 'OPEN', soloMios: true, miId: MI_ID, esAgente: true }),
     ).toEqual({ status: 'OPEN', assigneeId: MI_ID });
   });
 
@@ -25,7 +25,7 @@ describe('filtrosDeBandeja', () => {
   // usuario pidió.
   it('"mis tickets" sin id de sesión no manda assigneeId', () => {
     expect(
-      filtrosDeBandeja({ estado: '', soloMios: true, miId: undefined }),
+      filtrosDeBandeja({ estado: '', soloMios: true, miId: undefined, esAgente: true }),
     ).toEqual({});
   });
 
@@ -37,17 +37,35 @@ describe('filtrosDeBandeja', () => {
       estado: '',
       soloMios: false,
       miId: MI_ID,
+      esAgente: true,
     });
     expect(Object.keys(filtros)).toEqual([]);
   });
 
+  /**
+   * La decisión de fondo del archivo: "míos" es una palabra con dos
+   * significados. Un agente quiere lo que le toca; un VIEWER no puede tener
+   * nada asignado y quiere lo que abrió. Se traduce a campos distintos de la
+   * API en vez de que la palabra signifique cosas distintas en silencio.
+   */
+  it('"míos" es por asignación para un agente y por autoría para un viewer', () => {
+    expect(
+      filtrosDeBandeja({ estado: '', soloMios: true, miId: MI_ID, esAgente: true }),
+    ).toEqual({ assigneeId: MI_ID });
+
+    expect(
+      filtrosDeBandeja({ estado: '', soloMios: true, miId: MI_ID, esAgente: false }),
+    ).toEqual({ requesterId: MI_ID });
+  });
+
   it('dos combinaciones distintas de filtros no comparten clave de caché', () => {
-    const todos = filtrosDeBandeja({ estado: '', soloMios: false, miId: MI_ID });
-    const mios = filtrosDeBandeja({ estado: '', soloMios: true, miId: MI_ID });
+    const comun = { miId: MI_ID, esAgente: true };
+    const todos = filtrosDeBandeja({ ...comun, estado: '', soloMios: false });
+    const mios = filtrosDeBandeja({ ...comun, estado: '', soloMios: true });
     const miosAbiertos = filtrosDeBandeja({
+      ...comun,
       estado: 'OPEN',
       soloMios: true,
-      miId: MI_ID,
     });
 
     const claves = [todos, mios, miosAbiertos].map((f) => JSON.stringify(f));

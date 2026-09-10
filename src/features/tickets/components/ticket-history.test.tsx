@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { TicketActivity } from './ticket-activity';
 import { TicketHistory } from './ticket-history';
 import { ToastProvider } from '@/components/ui/toast';
+import { crearDirectorio, SIN_DIRECTORIO } from '@/features/members/directory';
 import { ApiError } from '@/lib/api/client';
 import type { Role } from '@/stores/auth-store';
 import type { TicketDetail } from '@/lib/api/types';
@@ -72,7 +73,7 @@ describe('TicketActivity', () => {
   // una petición extra por cada apertura para algo que casi nadie mira.
   it('no pide el historial hasta que se abre la pestaña', async () => {
     vi.mocked(api.getHistory).mockResolvedValue([]);
-    render(envolver(<TicketActivity ticket={TICKET} />));
+    render(envolver(<TicketActivity ticket={TICKET} directorio={SIN_DIRECTORIO} />));
 
     expect(api.getHistory).not.toHaveBeenCalled();
 
@@ -85,7 +86,7 @@ describe('TicketActivity', () => {
   // que responde 403 es peor que no ofrecérsela.
   it('un viewer no ve la pestaña de historial', () => {
     rolActual.valor = 'VIEWER';
-    render(envolver(<TicketActivity ticket={TICKET} />));
+    render(envolver(<TicketActivity ticket={TICKET} directorio={SIN_DIRECTORIO} />));
 
     expect(
       screen.queryByRole('tab', { name: /historial/i }),
@@ -97,7 +98,7 @@ describe('TicketActivity', () => {
 describe('TicketHistory', () => {
   it('un historial vacío no se confunde con un error', async () => {
     vi.mocked(api.getHistory).mockResolvedValue([]);
-    render(envolver(<TicketHistory ticket={TICKET} habilitado />));
+    render(envolver(<TicketHistory ticket={TICKET} directorio={SIN_DIRECTORIO} habilitado />));
 
     expect(
       await screen.findByText(/todavía no hay actividad registrada/i),
@@ -108,12 +109,53 @@ describe('TicketHistory', () => {
     vi.mocked(api.getHistory).mockRejectedValue(
       new ApiError(403, 'Forbidden resource', 'iam.forbidden'),
     );
-    render(envolver(<TicketHistory ticket={TICKET} habilitado />));
+    render(envolver(<TicketHistory ticket={TICKET} directorio={SIN_DIRECTORIO} habilitado />));
 
     expect(
       await screen.findByText(/el historial es solo para agentes/i),
     ).toBeInTheDocument();
     expect(screen.queryByText(/forbidden resource/i)).not.toBeInTheDocument();
+  });
+
+  /**
+   * El directorio solo lo tiene un AGENT (`GET /members` responde 403 a un
+   * VIEWER), así que la MISMA entrada se lee distinto según quién mire: con
+   * nombre para el agente, con el papel para el cliente. No es inconsistencia,
+   * es lo que cada uno tiene derecho a ver.
+   */
+  it('nombra a la persona cuando el directorio la tiene, y cae al papel cuando no', async () => {
+    const entrada = {
+      id: 'a2',
+      actorId: 'otra-persona',
+      action: 'comment.added',
+      metadata: null,
+      occurredAt: '2026-09-10T11:00:00.000Z',
+    };
+    vi.mocked(api.getHistory).mockResolvedValue([entrada]);
+
+    const conDirectorio = crearDirectorio([
+      {
+        userId: 'otra-persona',
+        email: 'lucia@acme.test',
+        role: 'AGENT',
+        joinedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]);
+
+    const { unmount } = render(
+      envolver(
+        <TicketHistory ticket={TICKET} directorio={conDirectorio} habilitado />,
+      ),
+    );
+    expect(await screen.findByText('lucia')).toBeInTheDocument();
+    unmount();
+
+    render(
+      envolver(
+        <TicketHistory ticket={TICKET} directorio={SIN_DIRECTORIO} habilitado />,
+      ),
+    );
+    expect(await screen.findByText('Otro miembro')).toBeInTheDocument();
   });
 
   it('describe cada entrada sin inventar lo que la metadata no dice', async () => {
@@ -126,7 +168,7 @@ describe('TicketHistory', () => {
         occurredAt: '2026-09-10T11:00:00.000Z',
       },
     ]);
-    render(envolver(<TicketHistory ticket={TICKET} habilitado />));
+    render(envolver(<TicketHistory ticket={TICKET} directorio={SIN_DIRECTORIO} habilitado />));
 
     expect(await screen.findByText('Cambió el estado')).toBeInTheDocument();
     // Sin `from`/`to` legibles no se pinta ninguna insignia de estado.

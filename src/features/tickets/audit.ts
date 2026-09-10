@@ -1,3 +1,4 @@
+import { etiquetaDe, type Directorio } from '@/features/members/directory';
 import {
   SYSTEM_ACTOR_ID,
   TICKET_PRIORITIES,
@@ -56,6 +57,28 @@ export function papelDelActor(
 
 export function textoDelPapel(papel: PapelActor): string {
   return PAPEL_TEXTO[papel];
+}
+
+/**
+ * Cómo nombrar a quien hizo algo.
+ *
+ * El orden importa. "Vos" y "El sistema" ganan siempre: son más informativos que
+ * un correo, y en el caso del sistema no hay persona detrás. Para el resto se
+ * usa el nombre real **si el directorio lo tiene**, y si no se cae al papel.
+ *
+ * El directorio solo existe para AGENT o superior (`GET /members` responde 403 a
+ * un VIEWER, ADR-0025), así que esta misma pantalla dice "Solicitante" para el
+ * cliente final y el correo de la persona para un agente. No es una
+ * inconsistencia: es exactamente la información que cada uno tiene derecho a ver.
+ */
+export function etiquetaDelActor(
+  actorId: string,
+  papel: PapelActor,
+  directorio: Directorio,
+): string {
+  if (papel === 'vos' || papel === 'sistema') return PAPEL_TEXTO[papel];
+  const miembro = directorio(actorId);
+  return miembro === null ? PAPEL_TEXTO[papel] : etiquetaDe(miembro);
 }
 
 export interface EntradaDescrita {

@@ -146,12 +146,14 @@ comentarios, transición inválida, sla-policy y refresh).
   refresh el usuario queda con el email vacío. Se rellena al hacer login.
 - No hay pantalla de invitación de miembros ni de gestión de roles (el backend
   tampoco los expone).
-- **La variante VIEWER de "Mis tickets" espera al backend.** El filtro actual es
-  por `assigneeId`, y a un VIEWER no se le puede asignar nada; el suyo sería
-  "los que abrí yo", que necesita un `requesterId` que `GET /tickets` todavía no
-  acepta. Cuando exista, entra en `features/tickets/filters.ts`.
-- Sigue sin haber selector de personas para asignar: hace falta un `GET /members`
-  en el backend.
+- **El front ya consume `GET /members` y `requesterId`, pero el backend los trae
+  la rama `feat/members-endpoint` de `helpdesk-api`, sin mergear.** Hasta que se
+  integre, el selector de personas responde 403 y el filtro del VIEWER devuelve
+  400 contra la API vieja. Las dos ramas entran juntas.
+- Los nombres en la conversación **solo los ve un AGENT**: `GET /members` responde
+  403 a un VIEWER a propósito. Para el cliente final se sigue diciendo el papel.
+  La salida acordada es enriquecer `GET /tickets/:id` con los participantes de
+  ESE ticket; sigue pendiente.
 
 ## Capa de UI (2026-09-10)
 
@@ -227,6 +229,25 @@ Sin dependencias nuevas: `@base-ui/react` ya estaba y trae `toast`, `tooltip`,
   reintenta los 4xx** (el default `retry: 1` disparaba dos peticiones contra el
   mismo 403). No hizo falta tocar `ws-provider`: `ticketKeys.history` cuelga de
   `ticketKeys.detail`, así que la invalidación existente ya lo alcanza.
+
+### Directorio de miembros (2026-09-10)
+
+- **`features/members/`** — `GET /members` con `staleTime` de 5 minutos y clave
+  compartida: se pide una vez para toda la aplicación, no una por ticket abierto.
+  Como el historial, **no reintenta los 4xx**.
+- **`crearDirectorio()` devuelve `null` cuando no conoce a alguien**, y quien
+  llama decide con qué rellenar. Es la pieza que mantiene la regla del repo: un
+  VIEWER no tiene directorio (403) y un agente dado de baja no está en la lista
+  aunque siga en la auditoría, así que en los dos casos se cae al papel
+  ("Solicitante", "Agente asignado") en vez de inventar un nombre.
+- **El selector de asignación muestra el ROL de cada persona.** No es decoración:
+  el backend deja asignarle un ticket a cualquier miembro (`isMember` no mira el
+  rol) mientras el reparto automático solo elige entre AGENT y ADMIN. Se decidió
+  no endurecer la regla de negocio y hacer visible lo que se está haciendo.
+- **"Míos" significa dos cosas y por eso son dos campos.** Un agente quiere lo
+  que le toca (`assigneeId`); un VIEWER no puede tener nada asignado y quiere lo
+  que abrió (`requesterId`). La traducción vive en `filtrosDeBandeja`, y el botón
+  cambia de etiqueta para decir lo que de verdad hace.
 
 ### Gotcha que costó el build
 

@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Avatar, Textarea } from '@/components/ui/primitives';
 import { useAvisos } from '@/components/ui/toast';
 import { useSession } from '@/features/auth/session';
-import { papelDelActor, textoDelPapel } from '@/features/tickets/audit';
+import { etiquetaDelActor, papelDelActor } from '@/features/tickets/audit';
 import { FechaRelativa } from '@/features/tickets/components/ticket-badges';
 import { useAddComment } from '@/features/tickets/queries';
 import { ApiError } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
+import type { Directorio } from '@/features/members/directory';
 import type { TicketComment, TicketDetail } from '@/lib/api/types';
 
 /**
@@ -19,7 +20,13 @@ import type { TicketComment, TicketDetail } from '@/lib/api/types';
  * el archivo estaba en 480 líneas y componer dos paneles ahí adentro lo volvía
  * ilegible. La extracción no cambia comportamiento.
  */
-export function TicketComments({ ticket }: { ticket: TicketDetail }) {
+export function TicketComments({
+  ticket,
+  directorio,
+}: {
+  ticket: TicketDetail;
+  directorio: Directorio;
+}) {
   const [texto, setTexto] = useState('');
   const avisos = useAvisos();
   const comentar = useAddComment(ticket.id);
@@ -52,6 +59,7 @@ export function TicketComments({ ticket }: { ticket: TicketDetail }) {
               key={comentario.id}
               comentario={comentario}
               ticket={ticket}
+              directorio={directorio}
             />
           ))}
         </ol>
@@ -95,9 +103,11 @@ export function TicketComments({ ticket }: { ticket: TicketDetail }) {
 function Comentario({
   comentario,
   ticket,
+  directorio,
 }: {
   comentario: TicketComment;
   ticket: TicketDetail;
+  directorio: Directorio;
 }) {
   const { user } = useSession();
 
@@ -114,7 +124,7 @@ function Comentario({
       <div className="min-w-0 flex-1">
         <p className="flex items-baseline gap-2 text-xs">
           <span className="font-semibold text-foreground">
-            {textoDelPapel(papel)}
+            {etiquetaDelActor(comentario.authorId, papel, directorio)}
           </span>
           <span className="text-muted-foreground">
             <FechaRelativa iso={comentario.createdAt} />

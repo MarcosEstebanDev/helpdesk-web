@@ -3,7 +3,7 @@
 import { ArrowRight } from 'lucide-react';
 import { Avatar, ErrorText, Skeleton } from '@/components/ui/primitives';
 import { useSession } from '@/features/auth/session';
-import { describirEntrada, textoDelPapel } from '@/features/tickets/audit';
+import { describirEntrada, etiquetaDelActor } from '@/features/tickets/audit';
 import {
   FechaRelativa,
   StatusBadge,
@@ -11,6 +11,7 @@ import {
 import { useTicketHistory } from '@/features/tickets/queries';
 import { ApiError } from '@/lib/api/client';
 import { fechaCorta } from '@/lib/format/relative-time';
+import type { Directorio } from '@/features/members/directory';
 import type { AuditEntry, TicketDetail } from '@/lib/api/types';
 
 const PRIORIDAD_TEXTO = {
@@ -39,9 +40,11 @@ const RELOJ_TEXTO = {
  */
 export function TicketHistory({
   ticket,
+  directorio,
   habilitado,
 }: {
   ticket: TicketDetail;
+  directorio: Directorio;
   habilitado: boolean;
 }) {
   const { user } = useSession();
@@ -101,6 +104,7 @@ export function TicketHistory({
             entrada={entrada}
             ticket={ticket}
             miId={user?.id}
+            directorio={directorio}
           />
         ))}
       </ol>
@@ -122,10 +126,12 @@ function Entrada({
   entrada,
   ticket,
   miId,
+  directorio,
 }: {
   entrada: AuditEntry;
   ticket: TicketDetail;
   miId: string | undefined;
+  directorio: Directorio;
 }) {
   const d = describirEntrada(entrada, {
     miId,
@@ -139,7 +145,9 @@ function Entrada({
 
       <div className="min-w-0 flex-1 space-y-1">
         <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
-          <span className="font-semibold">{textoDelPapel(d.papel)}</span>
+          <span className="font-semibold">
+            {etiquetaDelActor(entrada.actorId, d.papel, directorio)}
+          </span>
           <span>{d.frase}</span>
           {d.prioridad ? (
             <span className="text-muted-foreground">

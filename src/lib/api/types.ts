@@ -45,6 +45,32 @@ export interface MeResponse {
   userId: string;
   tenantId: string;
   role: Role;
+  /** Se lee de la base en el backend; no viaja en el token. */
+  email: string;
+}
+
+// ---------------------------------------------------------------- miembros
+
+/**
+ * Un miembro de la organización (`GET /members`, ADR-0025 del backend).
+ *
+ * **Solo lo puede pedir un AGENT o superior.** Un VIEWER es el cliente final, y
+ * el listado de empleados en sus manos sería una lista de correos cosechable: la
+ * interfaz no debe ofrecerle nada que dependa de esto.
+ *
+ * `userId` y no `id`: es el valor que piden `assigneeId`, `requesterId` y
+ * `authorId`. Y la etiqueta legible es el **email**, porque el backend no tiene
+ * columna `name`.
+ */
+export interface Member {
+  userId: string;
+  email: string;
+  role: Role;
+  joinedAt: string;
+}
+
+export interface MemberList {
+  items: Member[];
 }
 
 // ---------------------------------------------------------------- tickets

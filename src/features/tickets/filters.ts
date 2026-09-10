@@ -22,20 +22,34 @@ import type { TicketStatus } from '@/lib/api/types';
 export type FiltrosDeBandeja = {
   status?: TicketStatus;
   assigneeId?: string;
+  requesterId?: string;
 };
 
 export function filtrosDeBandeja({
   estado,
   soloMios,
   miId,
+  esAgente,
 }: {
   estado: TicketStatus | '';
   soloMios: boolean;
   miId: string | undefined;
+  /** Decide QUÉ significa "míos": ver abajo. */
+  esAgente: boolean;
 }): FiltrosDeBandeja {
   const filtros: FiltrosDeBandeja = {};
   if (estado !== '') filtros.status = estado;
-  if (soloMios && miId !== undefined) filtros.assigneeId = miId;
+
+  // "Míos" no significa lo mismo para todos, y por eso son dos campos distintos
+  // y no uno. Un agente quiere lo que le TOCA (`assigneeId`); un VIEWER es el
+  // cliente final, no puede tener nada asignado, y lo suyo son los tickets que
+  // ABRIÓ (`requesterId`). Un solo filtro obligaría a que la palabra significara
+  // una cosa para unos y otra para otros sin decirlo.
+  if (soloMios && miId !== undefined) {
+    if (esAgente) filtros.assigneeId = miId;
+    else filtros.requesterId = miId;
+  }
+
   return filtros;
 }
 

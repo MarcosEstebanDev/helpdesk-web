@@ -5,6 +5,7 @@ import { Tabs, TabsList, TabsPanel, TabsTab } from '@/components/ui/tabs';
 import { useSession } from '@/features/auth/session';
 import { TicketComments } from '@/features/tickets/components/ticket-comments';
 import { TicketHistory } from '@/features/tickets/components/ticket-history';
+import type { Directorio } from '@/features/members/directory';
 import type { TicketDetail } from '@/lib/api/types';
 
 /**
@@ -20,7 +21,13 @@ import type { TicketDetail } from '@/lib/api/types';
  * `react-hooks/set-state-in-effect` de este repo es un error, y acá además no
  * hace falta — el valor de la pestaña ya es estado.
  */
-export function TicketActivity({ ticket }: { ticket: TicketDetail }) {
+export function TicketActivity({
+  ticket,
+  directorio,
+}: {
+  ticket: TicketDetail;
+  directorio: Directorio;
+}) {
   const { user } = useSession();
   const [pestania, setPestania] = useState('comentarios');
 
@@ -35,7 +42,7 @@ export function TicketActivity({ ticket }: { ticket: TicketDetail }) {
             ({ticket.comments.length})
           </span>
         </h2>
-        <TicketComments ticket={ticket} />
+        <TicketComments ticket={ticket} directorio={directorio} />
       </section>
     );
   }
@@ -65,11 +72,15 @@ export function TicketActivity({ ticket }: { ticket: TicketDetail }) {
           mirar el historial a media respuesta BORRA el borrador.
         */}
         <TabsPanel valor="comentarios" keepMounted>
-          <TicketComments ticket={ticket} />
+          <TicketComments ticket={ticket} directorio={directorio} />
         </TabsPanel>
 
         <TabsPanel valor="historial">
-          <TicketHistory ticket={ticket} habilitado={pestania === 'historial'} />
+          <TicketHistory
+            ticket={ticket}
+            directorio={directorio}
+            habilitado={pestania === 'historial'}
+          />
         </TabsPanel>
       </Tabs>
     </section>

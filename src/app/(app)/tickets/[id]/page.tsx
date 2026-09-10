@@ -14,6 +14,9 @@ import {
 } from '@/components/ui/primitives';
 import { useAvisos } from '@/components/ui/toast';
 import { useSession } from '@/features/auth/session';
+import { crearDirectorio, type Directorio } from '@/features/members/directory';
+import { useMembers } from '@/features/members/queries';
+import { AssigneePicker } from '@/features/tickets/components/assignee-picker';
 import { SlaPanel } from '@/features/tickets/components/sla-panel';
 import { TicketActivity } from '@/features/tickets/components/ticket-activity';
 import {
@@ -21,11 +24,7 @@ import {
   PriorityLabel,
   StatusBadge,
 } from '@/features/tickets/components/ticket-badges';
-import {
-  useAssignment,
-  useChangeStatus,
-  useTicket,
-} from '@/features/tickets/queries';
+import { useChangeStatus, useTicket } from '@/features/tickets/queries';
 import { ApiError } from '@/lib/api/client';
 import { useTicketWatch } from '@/lib/realtime/use-ticket-watch';
 import { cn } from '@/lib/utils';
@@ -62,6 +61,13 @@ export default function TicketDetailPage() {
   // los manda solo a quien lo está mirando (ADR-0023).
   useTicketWatch(ticketId);
 
+  // El directorio solo existe para AGENT o superior: `GET /members` le responde
+  // 403 a un VIEWER. Se pide una vez cada cinco minutos para toda la aplicación
+  // (clave compartida y `staleTime` largo), no una vez por ticket abierto.
+  const esAgente = user?.role === 'AGENT' || user?.role === 'ADMIN';
+  const { data: miembros } = useMembers(esAgente);
+  const directorio = crearDirectorio(miembros?.items);
+
   if (isPending) return <DetalleEsqueleto />;
 
   if (isError) {
@@ -84,8 +90,6 @@ export default function TicketDetailPage() {
       </div>
     );
   }
-
-  const esAgente = user?.role === 'AGENT' || user?.role === 'ADMIN';
 
   return (
     <div className="space-y-5">
@@ -114,11 +118,15 @@ export default function TicketDetailPage() {
             {ticket.description}
           </p>
 
-          <TicketActivity ticket={ticket} />
+          <TicketActivity ticket={ticket} directorio={directorio} />
         </div>
 
         <aside className="space-y-3 lg:sticky lg:top-16 lg:self-start">
-          <PanelDetalles ticket={ticket} esAgente={esAgente} />
+          <PanelDetalles
+            ticket={ticket}
+            esAgente={esAgente}
+            directorio={directorio}
+          />
           <section className="space-y-2">
             <h2 className="px-1 text-xs font-semibold text-muted-foreground">
               SLA
@@ -135,9 +143,11 @@ export default function TicketDetailPage() {
 function PanelDetalles({
   ticket,
   esAgente,
+  directorio,
 }: {
   ticket: TicketDetail;
   esAgente: boolean;
+  directorio: Directorio;
 }) {
   return (
     <Card className="divide-y divide-border">
@@ -155,7 +165,11 @@ function PanelDetalles({
         </Dato>
 
         <Dato etiqueta="Asignado">
-          <Asignacion ticket={ticket} esAgente={esAgente} />
+          <Asignacion
+            ticket={ticket}
+            esAgente={esAgente}
+            directorio={directorio}
+          />
         </Dato>
 
         <Dato etiqueta="Abierto">
@@ -263,74 +277,38 @@ function MenuDeEstado({ ticket }: { ticket: TicketDetail }) {
 }
 
 /**
- * No hay selector de personas porque el backend no expone ningún endpoint para
- * listar los miembros de la organización: `assign` pide un UUID. Con
- * "Asignármelo" se cubre el flujo real de un agente sin inventar un endpoint que
- * no existe.
+ * Quién tiene el ticket.
+ *
+ * Un AGENT ve un selector con todas las personas de la organización; un VIEWER
+ * ve texto, porque `GET /members` le responde 403 a propósito (ADR-0025 del
+ * backend): el listado de empleados no es para el cliente final.
  */
 function Asignacion({
   ticket,
   esAgente,
+  directorio,
 }: {
   ticket: TicketDetail;
   esAgente: boolean;
+  directorio: Directorio;
 }) {
   const { user } = useSession();
-  const avisos = useAvisos();
-  const { asignar, desasignar } = useAssignment(ticket.id);
-  const esMio = ticket.assigneeId === user?.id;
+
+  if (esAgente) {
+    return <AssigneePicker ticket={ticket} directorio={directorio} />;
+  }
 
   if (ticket.assigneeId === null) {
-    if (!esAgente) {
-      return <span className="text-muted-foreground">Sin asignar</span>;
-    }
-    return (
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={asignar.isPending || user === null}
-        onClick={() =>
-          user &&
-          asignar.mutate(user.id, {
-            onSuccess: () => avisos.exito('El ticket es tuyo'),
-            onError: (e) =>
-              avisos.error(
-                'No se pudo asignar',
-                e instanceof ApiError ? e.message : undefined,
-              ),
-          })
-        }
-      >
-        Asignármelo
-      </Button>
-    );
+    return <span className="text-muted-foreground">Sin asignar</span>;
   }
 
   return (
     <span className="flex items-center gap-2">
-      <Avatar variante={esMio ? 'vos' : 'otro'} aria-hidden />
-      <span className="min-w-0 flex-1 truncate">
-        {esMio ? 'Vos' : 'Otro agente'}
-      </span>
-      {esAgente ? (
-        <Button
-          variant="ghost"
-          size="xs"
-          disabled={desasignar.isPending}
-          onClick={() =>
-            desasignar.mutate(undefined, {
-              onSuccess: () => avisos.exito('Asignación quitada'),
-              onError: (e) =>
-                avisos.error(
-                  'No se pudo quitar la asignación',
-                  e instanceof ApiError ? e.message : undefined,
-                ),
-            })
-          }
-        >
-          Quitar
-        </Button>
-      ) : null}
+      <Avatar
+        variante={ticket.assigneeId === user?.id ? 'vos' : 'otro'}
+        aria-hidden
+      />
+      <span>{ticket.assigneeId === user?.id ? 'Vos' : 'Un agente'}</span>
     </span>
   );
 }

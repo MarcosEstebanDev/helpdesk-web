@@ -67,21 +67,18 @@ export default function TicketsPage() {
   const [soloMios, setSoloMios] = useState(false);
   const [abriendo, setAbriendo] = useState(false);
 
-  // Un VIEWER es el cliente que abrió el ticket: no se le puede asignar nada
-  // (el endpoint de asignación pide AGENT y el reparto automático solo elige
-  // entre AGENT y ADMIN), así que el filtro le devolvería siempre vacío.
-  //
-  // El filtro que un VIEWER sí querría —"los que abrí yo"— hoy NO existe en la
-  // API: `GET /tickets` no acepta `requesterId`. Antes que ofrecerle un botón
-  // que significa otra cosa, no se le ofrece. Cuando ese filtro llegue, acá
-  // entra su variante.
-  const puedeFiltrarPorAsignacion =
-    user?.role === 'AGENT' || user?.role === 'ADMIN';
+  // El filtro existe para los tres roles, pero NO significa lo mismo: un agente
+  // quiere lo que le toca (por asignación) y un VIEWER, que es el cliente final
+  // y no puede tener nada asignado, quiere lo que abrió (por autoría). La
+  // traducción a campos distintos de la API vive en `filtrosDeBandeja`; acá solo
+  // cambia la etiqueta, para que el botón diga lo que de verdad hace.
+  const esAgente = user?.role === 'AGENT' || user?.role === 'ADMIN';
 
   const filtros = filtrosDeBandeja({
     estado,
-    soloMios: soloMios && puedeFiltrarPorAsignacion,
+    soloMios,
     miId: user?.id,
+    esAgente,
   });
 
   const {
@@ -114,22 +111,20 @@ export default function TicketsPage() {
           ))}
         </Select>
 
-        {puedeFiltrarPorAsignacion ? (
-          // Botón conmutador y no una opción más del desplegable de estado:
-          // son dos dimensiones ortogonales, y el filtro real de un agente es
-          // "mis tickets en curso", que un solo `select` no deja expresar.
-          <Button
-            variant="outline"
-            aria-pressed={soloMios}
-            onClick={() => setSoloMios((v) => !v)}
-            className={cn(
-              soloMios && 'border-primary bg-accent text-accent-foreground',
-            )}
-          >
-            <UserCheck />
-            Mis tickets
-          </Button>
-        ) : null}
+        {/* Botón conmutador y no una opción más del desplegable de estado: son
+            dos dimensiones ortogonales, y el filtro real de un agente es "mis
+            tickets en curso", que un solo `select` no deja expresar. */}
+        <Button
+          variant="outline"
+          aria-pressed={soloMios}
+          onClick={() => setSoloMios((v) => !v)}
+          className={cn(
+            soloMios && 'border-primary bg-accent text-accent-foreground',
+          )}
+        >
+          <UserCheck />
+          {esAgente ? 'Mis tickets' : 'Los que abrí yo'}
+        </Button>
 
         <Button className="ml-auto" onClick={() => setAbriendo(true)}>
           <Plus />
@@ -304,15 +299,20 @@ function BandejaVacia({
 }) {
   const filtrada = hayFiltros(filtros);
   const porAsignacion = filtros.assigneeId !== undefined;
+  const porAutoria = filtros.requesterId !== undefined;
   const porEstado = filtros.status !== undefined;
 
   const mensaje = porAsignacion
     ? porEstado
       ? 'No tenés ningún ticket asignado con ese estado.'
       : 'No tenés ningún ticket asignado.'
-    : porEstado
-      ? 'Ningún ticket con ese estado.'
-      : 'La bandeja está vacía. Los tickets aparecen acá en cuanto alguien abre uno.';
+    : porAutoria
+      ? porEstado
+        ? 'No abriste ningún ticket con ese estado.'
+        : 'Todavía no abriste ningún ticket.'
+      : porEstado
+        ? 'Ningún ticket con ese estado.'
+        : 'La bandeja está vacía. Los tickets aparecen acá en cuanto alguien abre uno.';
 
   return (
     <Card className="flex flex-col items-center gap-3 px-6 py-12 text-center">
