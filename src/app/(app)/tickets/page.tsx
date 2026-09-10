@@ -1,6 +1,6 @@
 'use client';
 
-import { Inbox, Plus } from 'lucide-react';
+import { Inbox, Plus, UserCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,11 @@ import {
   PriorityBadge,
   StatusBadge,
 } from '@/features/tickets/components/ticket-badges';
+import {
+  filtrosDeBandeja,
+  hayFiltros,
+  type FiltrosDeBandeja,
+} from '@/features/tickets/filters';
 import { useCreateTicket, useTickets } from '@/features/tickets/queries';
 import { ApiError } from '@/lib/api/client';
 import { useWs } from '@/providers/ws-provider';
@@ -57,10 +62,28 @@ const PRIORIDAD_TEXTO: Record<TicketPriority, string> = {
  * hay ningún `setInterval` sondeando el servidor.
  */
 export default function TicketsPage() {
+  const { user } = useSession();
   const [estado, setEstado] = useState<TicketStatus | ''>('');
+  const [soloMios, setSoloMios] = useState(false);
   const [abriendo, setAbriendo] = useState(false);
 
-  const filtros = estado === '' ? {} : { status: estado };
+  // Un VIEWER es el cliente que abrió el ticket: no se le puede asignar nada
+  // (el endpoint de asignación pide AGENT y el reparto automático solo elige
+  // entre AGENT y ADMIN), así que el filtro le devolvería siempre vacío.
+  //
+  // El filtro que un VIEWER sí querría —"los que abrí yo"— hoy NO existe en la
+  // API: `GET /tickets` no acepta `requesterId`. Antes que ofrecerle un botón
+  // que significa otra cosa, no se le ofrece. Cuando ese filtro llegue, acá
+  // entra su variante.
+  const puedeFiltrarPorAsignacion =
+    user?.role === 'AGENT' || user?.role === 'ADMIN';
+
+  const filtros = filtrosDeBandeja({
+    estado,
+    soloMios: soloMios && puedeFiltrarPorAsignacion,
+    miId: user?.id,
+  });
+
   const {
     data,
     isPending,
@@ -91,6 +114,23 @@ export default function TicketsPage() {
           ))}
         </Select>
 
+        {puedeFiltrarPorAsignacion ? (
+          // Botón conmutador y no una opción más del desplegable de estado:
+          // son dos dimensiones ortogonales, y el filtro real de un agente es
+          // "mis tickets en curso", que un solo `select` no deja expresar.
+          <Button
+            variant="outline"
+            aria-pressed={soloMios}
+            onClick={() => setSoloMios((v) => !v)}
+            className={cn(
+              soloMios && 'border-primary bg-accent text-accent-foreground',
+            )}
+          >
+            <UserCheck />
+            Mis tickets
+          </Button>
+        ) : null}
+
         <Button className="ml-auto" onClick={() => setAbriendo(true)}>
           <Plus />
           Abrir ticket
@@ -118,8 +158,11 @@ export default function TicketsPage() {
         </Card>
       ) : tickets.length === 0 ? (
         <BandejaVacia
-          filtrada={estado !== ''}
-          onVerTodos={() => setEstado('')}
+          filtros={filtros}
+          onVerTodos={() => {
+            setEstado('');
+            setSoloMios(false);
+          }}
           onAbrir={() => setAbriendo(true)}
         />
       ) : (
@@ -243,26 +286,41 @@ function ListaEsqueleto() {
   );
 }
 
+/**
+ * Una bandeja vacía no significa lo mismo según qué esté filtrando.
+ *
+ * El caso que importa es el tercero: un agente que activó "mis tickets" y no ve
+ * nada no está ante un error ni ante un sistema vacío — no tiene trabajo
+ * asignado. Decírselo con esas palabras evita que crea que algo se rompió.
+ */
 function BandejaVacia({
-  filtrada,
+  filtros,
   onVerTodos,
   onAbrir,
 }: {
-  filtrada: boolean;
+  filtros: FiltrosDeBandeja;
   onVerTodos: () => void;
   onAbrir: () => void;
 }) {
+  const filtrada = hayFiltros(filtros);
+  const porAsignacion = filtros.assigneeId !== undefined;
+  const porEstado = filtros.status !== undefined;
+
+  const mensaje = porAsignacion
+    ? porEstado
+      ? 'No tenés ningún ticket asignado con ese estado.'
+      : 'No tenés ningún ticket asignado.'
+    : porEstado
+      ? 'Ningún ticket con ese estado.'
+      : 'La bandeja está vacía. Los tickets aparecen acá en cuanto alguien abre uno.';
+
   return (
     <Card className="flex flex-col items-center gap-3 px-6 py-12 text-center">
       <Inbox className="size-8 text-muted-foreground/60" aria-hidden />
-      <p className="text-sm text-muted-foreground">
-        {filtrada
-          ? 'Ningún ticket con ese estado.'
-          : 'La bandeja está vacía. Los tickets aparecen acá en cuanto alguien abre uno.'}
-      </p>
+      <p className="text-sm text-muted-foreground">{mensaje}</p>
       {filtrada ? (
         <Button variant="outline" size="sm" onClick={onVerTodos}>
-          Ver todos los estados
+          Ver todos
         </Button>
       ) : (
         <Button size="sm" onClick={onAbrir}>
