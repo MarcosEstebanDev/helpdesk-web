@@ -23,6 +23,16 @@ usuario falsos, sin barras de progreso deducidas, sin estados adivinados.
 - **Ramas:** `main` es producción, `dev` es integración. Las features salen de
   `dev` y vuelven a `dev`.
 
+## Por dónde retomar
+
+El plan de trabajo de los DOS repos vive en el backend:
+**`helpdesk-api/docs/ROADMAP.md`**. Ahí está el estado, cómo levantar el entorno
+local, qué mejorar del producto y las restricciones de despliegue.
+
+Lo pendiente que toca a este repo: los nombres de los participantes para un
+VIEWER (hoy un agente ve correos y un VIEWER ve papeles), que necesita enriquecer
+`GET /tickets/:id` en el backend antes.
+
 ## Stack
 
 Next.js 16 (App Router, React 19) · TypeScript estricto · Tailwind 4 + shadcn/ui ·
