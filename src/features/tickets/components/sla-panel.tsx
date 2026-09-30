@@ -1,4 +1,6 @@
-import { Badge, Card } from '@/components/ui/primitives';
+import { Card } from '@/components/ui/primitives';
+import { fechaCorta } from '@/lib/format/relative-time';
+import { cn } from '@/lib/utils';
 import type { TicketSla } from '@/lib/api/types';
 
 const NOMBRE = {
@@ -14,13 +16,19 @@ const NOMBRE = {
  * aquí solo se pinta. Calcularlo en el cliente contra `Date.now()` haría que el
  * margen de un ticket resuelto la semana pasada empeorase cada vez que alguien
  * abre la pantalla.
+ *
+ * Por el mismo motivo **no hay barra de progreso**, que sería lo obvio para un
+ * reloj: dibujar cuánto se consumió exige saber cuándo arrancó, y eso el DTO no
+ * lo trae. Deducirlo de `dueAt - createdAt` funcionaría solo mientras ningún
+ * reloj se pause, y una barra que miente es peor que ninguna barra. El estado se
+ * codifica en el color del filo, que sí se lee de un vistazo y no inventa nada.
  */
 export function SlaPanel({ sla }: { sla: TicketSla[] }) {
   if (sla.length === 0) {
     // Ni se inventa un "cumple" ni se esconde: los tickets anteriores a la fase
     // 6, y los que el worker aún no procesó, no tienen relojes que enseñar.
     return (
-      <Card className="p-4 text-sm text-muted-foreground">
+      <Card className="p-3 text-xs text-muted-foreground">
         Este ticket no tiene relojes de SLA.
       </Card>
     );
@@ -29,34 +37,68 @@ export function SlaPanel({ sla }: { sla: TicketSla[] }) {
   return (
     <Card className="divide-y divide-border">
       {sla.map((reloj) => (
-        <div key={reloj.kind} className="flex items-center gap-3 px-4 py-3">
-          <span className="flex-1 text-sm">{NOMBRE[reloj.kind]}</span>
-          <span className="text-xs text-muted-foreground">
-            vence {new Date(reloj.dueAt).toLocaleString()}
-          </span>
-          <SlaEstado reloj={reloj} />
+        <div key={reloj.kind} className="flex items-start gap-2.5 p-3">
+          <span
+            aria-hidden
+            className={cn(
+              'mt-0.5 h-8 w-0.5 shrink-0 rounded-full',
+              COLOR_FILO[situacion(reloj)],
+            )}
+          />
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <p className="text-sm font-medium">{NOMBRE[reloj.kind]}</p>
+            <p
+              className={cn('text-xs font-medium', COLOR_TEXTO[situacion(reloj)])}
+            >
+              <SlaEstado reloj={reloj} />
+            </p>
+            <p className="text-xs text-muted-foreground" suppressHydrationWarning>
+              vence {fechaCorta(reloj.dueAt)}
+            </p>
+          </div>
         </div>
       ))}
     </Card>
   );
 }
 
+type Situacion = 'incumplido' | 'cumplido' | 'vencido' | 'en-marcha';
+
+const COLOR_FILO: Record<Situacion, string> = {
+  incumplido: 'bg-destructive',
+  cumplido: 'bg-success-foreground',
+  vencido: 'bg-warning-foreground',
+  'en-marcha': 'bg-primary',
+};
+
+const COLOR_TEXTO: Record<Situacion, string> = {
+  incumplido: 'text-destructive',
+  cumplido: 'text-success-foreground',
+  vencido: 'text-warning-foreground',
+  'en-marcha': 'text-foreground',
+};
+
+function situacion(reloj: TicketSla): Situacion {
+  if (reloj.status === 'breached') return 'incumplido';
+  if (reloj.status === 'met') return 'cumplido';
+  // En marcha y ya pasado de hora: el barrido puede no haber pasado todavía.
+  if (reloj.remainingMinutes < 0) return 'vencido';
+  return 'en-marcha';
+}
+
 function SlaEstado({ reloj }: { reloj: TicketSla }) {
   if (reloj.status === 'breached') {
-    return (
-      <Badge tone="danger">Incumplido por {margen(-reloj.remainingMinutes)}</Badge>
-    );
+    return <>Incumplido por {margen(-reloj.remainingMinutes)}</>;
   }
   if (reloj.status === 'met') {
-    return <Badge tone="success">Cumplido, {margen(reloj.remainingMinutes)} antes</Badge>;
+    return <>Cumplido, {margen(reloj.remainingMinutes)} antes</>;
   }
-  // En marcha y ya pasado de hora: el barrido puede no haber pasado todavía. No
-  // se dice que va bien, pero tampoco se marca como incumplido antes de que el
-  // backend lo registre.
+  // No se dice que va bien, pero tampoco se marca como incumplido antes de que
+  // el backend lo registre.
   if (reloj.remainingMinutes < 0) {
-    return <Badge tone="warning">Vencido, sin registrar</Badge>;
+    return <>Vencido, sin registrar</>;
   }
-  return <Badge tone="info">Quedan {margen(reloj.remainingMinutes)}</Badge>;
+  return <>Quedan {margen(reloj.remainingMinutes)}</>;
 }
 
 /** Minutos a algo legible: 90 -> "1 h 30 min". */

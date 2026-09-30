@@ -7,6 +7,8 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import * as api from '@/features/tickets/api';
+import type { FiltrosDeBandeja } from '@/features/tickets/filters';
+import { ApiError } from '@/lib/api/client';
 import { ticketKeys } from '@/lib/query/keys';
 import type { TicketPriority, TicketStatus } from '@/lib/api/types';
 
@@ -20,7 +22,7 @@ const PAGE_SIZE = 20;
  * donde los tickets entran solos —los crea el worker, los crea el email— eso no
  * es un caso raro: es el caso normal.
  */
-export function useTickets(filtros: { status?: TicketStatus } = {}) {
+export function useTickets(filtros: FiltrosDeBandeja = {}) {
   return useInfiniteQuery({
     queryKey: ticketKeys.list(filtros),
     queryFn: ({ pageParam }) =>
@@ -46,6 +48,11 @@ export function useTicketHistory(ticketId: string, habilitado: boolean) {
     queryKey: ticketKeys.history(ticketId),
     queryFn: () => api.getHistory(ticketId),
     enabled: habilitado,
+    // No se reintentan los 4xx. El default de TanStack Query es `retry: 1`, así
+    // que un 403 —rol cambiado, sesión vieja— dispararía dos peticiones contra
+    // el mismo "no". Los 5xx sí se reintentan: ahí el retry sirve para algo.
+    retry: (intentos, error) =>
+      !(error instanceof ApiError && error.status < 500) && intentos < 1,
   });
 }
 

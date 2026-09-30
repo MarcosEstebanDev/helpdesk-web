@@ -17,10 +17,16 @@ import { ticketKeys } from '@/lib/query/keys';
 import type {
   CommentAddedMessage,
   DisconnectedMessage,
+  SlaBreachedMessage,
+  TicketAssignmentMessage,
+  TicketCreatedMessage,
   TicketStatusChangedMessage,
 } from '@/lib/realtime/events';
 import { CLIENT_EVENTS, createRealtimeSocket } from '@/lib/realtime/socket';
 import { useAuthStore } from '@/stores/auth-store';
+
+/** Cuánto se considera "recién cambiado" a un ticket, en milisegundos. */
+const VENTANA_DE_CAMBIO = 10_000;
 
 type WsContextValue = {
   connected: boolean;
@@ -29,11 +35,18 @@ type WsContextValue = {
    * dejar de seguirlo; usar `useTicketWatch` en vez de llamar a esto a mano.
    */
   watchTicket: (ticketId: string) => () => void;
+  /**
+   * Qué tickets acaban de cambiar por un aviso del servidor, con el instante en
+   * que llegó. Es lo único que se toma del payload además del id, y no sustituye
+   * a la invalidación: los datos siguen viniendo de la API.
+   */
+  cambiosRecientes: Record<string, number>;
 };
 
 const WsContext = createContext<WsContextValue>({
   connected: false,
   watchTicket: () => () => {},
+  cambiosRecientes: {},
 });
 
 /**
@@ -58,9 +71,34 @@ export function WsProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((s) => s.accessToken);
   const [connected, setConnected] = useState(false);
+  const [cambiosRecientes, setCambiosRecientes] = useState<
+    Record<string, number>
+  >({});
   const socketRef = useRef<Socket | null>(null);
   /** Tickets seguidos, con cuántos componentes los están mirando. */
   const watched = useRef(new Map<string, number>());
+
+  /**
+   * Anota qué ticket acaba de cambiar, para que la lista pueda señalarlo.
+   *
+   * Una pantalla que se actualiza sola tiene un problema propio: el cambio
+   * ocurre donde el usuario no está mirando y se lo pierde. Invalidar la caché
+   * hace que el dato sea correcto; esto hace que además se note.
+   *
+   * De paso se descartan los anotados hace rato, para que el objeto no crezca
+   * durante una sesión larga.
+   */
+  const anotarCambio = useCallback((ticketId: string) => {
+    const ahora = Date.now();
+    setCambiosRecientes((previos) => {
+      const vigentes: Record<string, number> = {};
+      for (const [id, momento] of Object.entries(previos)) {
+        if (ahora - momento < VENTANA_DE_CAMBIO) vigentes[id] = momento;
+      }
+      vigentes[ticketId] = ahora;
+      return vigentes;
+    });
+  }, []);
 
   useEffect(() => {
     // Sin token no hay conexión. No hace falta poner `connected` en false aquí:
@@ -104,8 +142,9 @@ export function WsProvider({ children }: { children: ReactNode }) {
 
     // ---------------------------------------------------------- invalidación
 
-    socket.on('ticket.created', () => {
+    socket.on('ticket.created', (msg: TicketCreatedMessage) => {
       void queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
+      anotarCambio(msg.ticketId);
     });
 
     socket.on('ticket.status_changed', (msg: TicketStatusChangedMessage) => {
@@ -113,6 +152,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
       void queryClient.invalidateQueries({
         queryKey: ticketKeys.detail(msg.ticketId),
       });
+      anotarCambio(msg.ticketId);
     });
 
     socket.on('comment.added', (msg: CommentAddedMessage) => {
@@ -125,13 +165,15 @@ export function WsProvider({ children }: { children: ReactNode }) {
     // `ticket.assigned` / `ticket.unassigned` / `sla.breached` solo llegan a
     // AGENT y ADMIN; el backend no los manda a la sala general (ADR-0023).
     for (const evento of ['ticket.assigned', 'ticket.unassigned'] as const) {
-      socket.on(evento, () => {
+      socket.on(evento, (msg: TicketAssignmentMessage) => {
         void queryClient.invalidateQueries({ queryKey: ticketKeys.all });
+        anotarCambio(msg.ticketId);
       });
     }
 
-    socket.on('sla.breached', () => {
+    socket.on('sla.breached', (msg: SlaBreachedMessage) => {
       void queryClient.invalidateQueries({ queryKey: ticketKeys.all });
+      anotarCambio(msg.ticketId);
     });
 
     return () => {
@@ -141,7 +183,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
       socketRef.current = null;
       setConnected(false);
     };
-  }, [accessToken, queryClient]);
+  }, [accessToken, queryClient, anotarCambio]);
 
   /**
    * Se lleva la cuenta de cuántos componentes siguen cada ticket porque dos
@@ -167,8 +209,8 @@ export function WsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ connected, watchTicket }),
-    [connected, watchTicket],
+    () => ({ connected, watchTicket, cambiosRecientes }),
+    [connected, watchTicket, cambiosRecientes],
   );
 
   return <WsContext.Provider value={value}>{children}</WsContext.Provider>;

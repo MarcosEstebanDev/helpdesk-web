@@ -5,12 +5,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import * as authApi from '@/features/auth/api';
 import { useSession } from '@/features/auth/session';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  ErrorText,
-  Input,
-  Label,
-} from '@/components/ui/primitives';
+import { Card, ErrorText, Input, Label } from '@/components/ui/primitives';
 import { ApiError } from '@/lib/api/client';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -26,7 +21,8 @@ type Modo = 'login' | 'register';
  * El detalle que salta a la vista: **el login pide el identificador de la
  * organización**. No es un capricho del formulario, es multi-tenancy real — el
  * mismo email puede tener cuenta en varias organizaciones, y son usuarios
- * distintos con roles distintos.
+ * distintos con roles distintos. Por eso el campo va primero y lleva su propia
+ * explicación debajo: es la pregunta que nadie espera en una pantalla de login.
  */
 export default function LoginPage() {
   const router = useRouter();
@@ -82,85 +78,102 @@ export default function LoginPage() {
     }
   }
 
+  const esLogin = modo === 'login';
+
   return (
-    <main className="flex flex-1 items-center justify-center px-6 py-12">
-      <Card className="w-full max-w-sm p-6">
-        <h1 className="text-xl font-semibold tracking-tight">
-          {modo === 'login' ? 'Entrar' : 'Crear organización'}
-        </h1>
-        <p className="mt-1 mb-6 text-sm text-muted-foreground">
-          {modo === 'login'
-            ? 'Indicá tu organización para identificar la cuenta.'
-            : 'Se crea la organización y quedás como administrador.'}
+    <main className="flex flex-1 items-center justify-center px-4 py-12">
+      <div className="w-full max-w-sm">
+        <p className="mb-5 text-center text-sm font-semibold tracking-tight">
+          Helpdesk
         </p>
 
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="org">
-              {modo === 'login' ? 'Organización (slug)' : 'Nombre de la organización'}
-            </Label>
-            <Input
-              id="org"
-              value={organizacion}
-              onChange={(e) => setOrganizacion(e.target.value)}
-              placeholder={modo === 'login' ? 'acme' : 'Acme SL'}
-              autoComplete="organization"
-              required
-            />
-          </div>
+        <Card className="p-5">
+          <h1 className="text-lg font-semibold tracking-tight">
+            {esLogin ? 'Entrar' : 'Crear organización'}
+          </h1>
+          <p className="mt-1 mb-5 text-sm text-muted-foreground">
+            {esLogin
+              ? 'Necesitamos saber a qué organización entrás.'
+              : 'Se crea la organización y quedás como administrador.'}
+          </p>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="ana@acme.com"
-              autoComplete="email"
-              required
-            />
-          </div>
+          <form onSubmit={onSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="org">
+                {esLogin ? 'Organización' : 'Nombre de la organización'}
+              </Label>
+              <Input
+                id="org"
+                value={organizacion}
+                onChange={(e) => setOrganizacion(e.target.value)}
+                placeholder={esLogin ? 'acme' : 'Acme SL'}
+                autoComplete="organization"
+                aria-describedby={esLogin ? 'org-ayuda' : undefined}
+                required
+              />
+              {esLogin ? (
+                <p id="org-ayuda" className="text-xs text-muted-foreground">
+                  El mismo email puede tener cuenta en varias organizaciones.
+                </p>
+              ) : null}
+            </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Contraseña</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete={
-                modo === 'login' ? 'current-password' : 'new-password'
-              }
-              minLength={8}
-              required
-            />
-          </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="ana@acme.com"
+                autoComplete="email"
+                required
+              />
+            </div>
 
-          <ErrorText>{error}</ErrorText>
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Contraseña</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={esLogin ? 'current-password' : 'new-password'}
+                minLength={8}
+                required
+              />
+            </div>
 
-          <Button type="submit" disabled={enviando} className="w-full">
-            {enviando
-              ? 'Enviando…'
-              : modo === 'login'
-                ? 'Entrar'
-                : 'Crear organización'}
-          </Button>
-        </form>
+            <ErrorText>{error}</ErrorText>
+
+            <Button
+              type="submit"
+              size="lg"
+              disabled={enviando}
+              className="w-full"
+            >
+              {enviando
+                ? 'Enviando…'
+                : esLogin
+                  ? 'Entrar'
+                  : 'Crear organización'}
+            </Button>
+          </form>
+        </Card>
 
         <button
           type="button"
-          className="mt-4 w-full text-sm text-muted-foreground underline-offset-4 hover:underline"
+          className="mt-4 w-full rounded-sm py-1 text-sm text-muted-foreground underline-offset-4 hover:text-accent-foreground hover:underline"
           onClick={() => {
-            setModo(modo === 'login' ? 'register' : 'login');
+            setModo(esLogin ? 'register' : 'login');
             setError(null);
           }}
         >
-          {modo === 'login'
+          {esLogin
             ? '¿No tenés organización? Creá una'
             : '¿Ya tenés cuenta? Entrá'}
         </button>
-      </Card>
+      </div>
     </main>
   );
 }

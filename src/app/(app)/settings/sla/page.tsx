@@ -4,17 +4,26 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import {
-  Badge,
   Card,
   ErrorText,
   Input,
   Label,
+  Lozenge,
+  Skeleton,
 } from '@/components/ui/primitives';
+import { useAvisos } from '@/components/ui/toast';
 import { useSession } from '@/features/auth/session';
 import * as slaApi from '@/features/sla/api';
 import { ApiError } from '@/lib/api/client';
 import { slaKeys } from '@/lib/query/keys';
 import type { EffectiveSlaTarget, TicketPriority } from '@/lib/api/types';
+
+const PRIORIDAD_TEXTO: Record<TicketPriority, string> = {
+  LOW: 'Baja',
+  NORMAL: 'Normal',
+  HIGH: 'Alta',
+  URGENT: 'Urgente',
+};
 
 /**
  * Configuración de SLA por prioridad.
@@ -41,10 +50,10 @@ export default function SlaSettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">SLA</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+    <div className="space-y-5">
+      <div className="max-w-prose">
+        <h1 className="text-xl font-semibold tracking-tight">SLA</h1>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
           Lo que la organización se compromete a cumplir, por prioridad. Los
           tickets ya abiertos conservan el objetivo con el que nacieron: cambiar
           esto solo afecta a los nuevos.
@@ -52,15 +61,24 @@ export default function SlaSettingsPage() {
       </div>
 
       {isPending ? (
-        <p className="text-sm text-muted-foreground">Cargando política…</p>
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((fila) => (
+            <Skeleton key={fila} className="h-14 w-full rounded-lg" />
+          ))}
+          <span className="sr-only" role="status">
+            Cargando la política de SLA
+          </span>
+        </div>
       ) : isError ? (
-        <ErrorText>
-          {error instanceof ApiError
-            ? error.message
-            : 'No se pudo cargar la política.'}
-        </ErrorText>
+        <Card className="p-4">
+          <ErrorText>
+            {error instanceof ApiError
+              ? error.message
+              : 'No se pudo cargar la política.'}
+          </ErrorText>
+        </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {data.map((objetivo) => (
             <FilaPrioridad key={objetivo.priority} objetivo={objetivo} />
           ))}
@@ -72,18 +90,19 @@ export default function SlaSettingsPage() {
 
 function FilaPrioridad({ objetivo }: { objetivo: EffectiveSlaTarget }) {
   const queryClient = useQueryClient();
+  const avisos = useAvisos();
   const [editando, setEditando] = useState(false);
   const [respuesta, setRespuesta] = useState(String(objetivo.responseMinutes));
   const [resolucion, setResolucion] = useState(
     String(objetivo.resolutionMinutes),
   );
 
-  const alGuardar = {
-    onSuccess: (politica: EffectiveSlaTarget[]) => {
-      queryClient.setQueryData(slaKeys.policy, politica);
-      setEditando(false);
-    },
-  };
+  /** La API devuelve la política entera ya efectiva: se planta en la caché en
+      vez de invalidar y volver a pedirla. */
+  function aplicar(politica: EffectiveSlaTarget[]) {
+    queryClient.setQueryData(slaKeys.policy, politica);
+    setEditando(false);
+  }
 
   const guardar = useMutation({
     mutationFn: (input: {
@@ -95,12 +114,20 @@ function FilaPrioridad({ objetivo }: { objetivo: EffectiveSlaTarget }) {
         responseMinutes: input.responseMinutes,
         resolutionMinutes: input.resolutionMinutes,
       }),
-    ...alGuardar,
+    onSuccess: (politica: EffectiveSlaTarget[]) => {
+      aplicar(politica);
+      avisos.exito(
+        `Objetivo guardado para prioridad ${PRIORIDAD_TEXTO[objetivo.priority].toLowerCase()}`,
+      );
+    },
   });
 
   const restaurar = useMutation({
     mutationFn: () => slaApi.resetSlaPolicy(objetivo.priority),
-    ...alGuardar,
+    onSuccess: (politica: EffectiveSlaTarget[]) => {
+      aplicar(politica);
+      avisos.exito('Objetivo restaurado al valor de fábrica');
+    },
   });
 
   function onSubmit(e: FormEvent) {
@@ -115,16 +142,18 @@ function FilaPrioridad({ objetivo }: { objetivo: EffectiveSlaTarget }) {
   const errorApi = guardar.error ?? restaurar.error;
 
   return (
-    <Card className="p-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="font-medium">{objetivo.priority}</span>
+    <Card className="p-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="w-16 shrink-0 text-sm font-semibold">
+          {PRIORIDAD_TEXTO[objetivo.priority]}
+        </span>
 
         {/* `source` es el dato que evita tocar a ciegas: sin él no se distingue
             "esto lo pactamos" de "esto no lo tocó nadie". */}
         {objetivo.source === 'organization' ? (
-          <Badge tone="info">Pactado</Badge>
+          <Lozenge tone="info">Pactado</Lozenge>
         ) : (
-          <Badge tone="neutral">De fábrica</Badge>
+          <Lozenge tone="neutral">De fábrica</Lozenge>
         )}
 
         {editando ? null : (
@@ -134,7 +163,7 @@ function FilaPrioridad({ objetivo }: { objetivo: EffectiveSlaTarget }) {
           </span>
         )}
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1">
           {objetivo.source === 'organization' ? (
             <Button
               variant="ghost"
@@ -156,16 +185,17 @@ function FilaPrioridad({ objetivo }: { objetivo: EffectiveSlaTarget }) {
       </div>
 
       {editando ? (
-        <form onSubmit={onSubmit} className="mt-4 flex flex-wrap items-end gap-3">
+        <form
+          onSubmit={onSubmit}
+          className="mt-3 flex flex-wrap items-end gap-3 border-t border-border pt-3"
+        >
           <div className="space-y-1.5">
-            <Label htmlFor={`resp-${objetivo.priority}`}>
-              Respuesta (min)
-            </Label>
+            <Label htmlFor={`resp-${objetivo.priority}`}>Respuesta (min)</Label>
             <Input
               id={`resp-${objetivo.priority}`}
               type="number"
               min={1}
-              className="w-32"
+              className="w-28"
               value={respuesta}
               onChange={(e) => setRespuesta(e.target.value)}
               required
@@ -173,14 +203,12 @@ function FilaPrioridad({ objetivo }: { objetivo: EffectiveSlaTarget }) {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor={`reso-${objetivo.priority}`}>
-              Resolución (min)
-            </Label>
+            <Label htmlFor={`reso-${objetivo.priority}`}>Resolución (min)</Label>
             <Input
               id={`reso-${objetivo.priority}`}
               type="number"
               min={1}
-              className="w-32"
+              className="w-28"
               value={resolucion}
               onChange={(e) => setResolucion(e.target.value)}
               required
@@ -199,13 +227,15 @@ function FilaPrioridad({ objetivo }: { objetivo: EffectiveSlaTarget }) {
         duplicarla aquí la desincronizaría en cuanto cambiara. Se muestra tal
         como llega.
       */}
-      <ErrorText>
-        {errorApi
-          ? errorApi instanceof ApiError
-            ? errorApi.message
-            : 'No se pudo guardar el objetivo.'
-          : null}
-      </ErrorText>
+      {errorApi ? (
+        <div className="mt-2">
+          <ErrorText>
+            {errorApi instanceof ApiError
+              ? errorApi.message
+              : 'No se pudo guardar el objetivo.'}
+          </ErrorText>
+        </div>
+      ) : null}
     </Card>
   );
 }

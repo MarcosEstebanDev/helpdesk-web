@@ -27,3 +27,15 @@ export const ticketKeys = {
 export const slaKeys = {
   policy: ['sla', 'policy'] as const,
 };
+
+/**
+ * Directorio de miembros (`GET /members`, solo AGENT o superior).
+ *
+ * Cambia poquísimo —alta o baja de personal— y se consulta cada vez que se abre
+ * un selector de asignación, así que vive con `staleTime` largo. No lo invalida
+ * el realtime: el backend no emite ningún evento de membresías.
+ */
+export const memberKeys = {
+  all: ['members'] as const,
+  list: () => [...memberKeys.all, 'list'] as const,
+};
