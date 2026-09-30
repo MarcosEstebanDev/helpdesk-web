@@ -158,6 +158,17 @@ The API URL is a **build argument**, not a runtime variable. Next.js substitutes
 `NEXT_PUBLIC_*` statically during the build, so passing it with `-e` at `docker
 run` time has no effect on the bundle the browser receives.
 
+## Deployment
+
+Deployed on Railway with `railway.json` (Dockerfile build, healthcheck on
+`/login`). The full guide covers both repos and lives in the backend:
+[`helpdesk-api/docs/DEPLOY.md`](https://github.com/MarcosEstebanDev/helpdesk-api/blob/main/docs/DEPLOY.md).
+
+One constraint shapes it: the refresh cookie is `SameSite=Lax`, so the front and
+the API must be the **same site** (`app.example.dev` and `api.example.dev`).
+Two platform domains such as `*.up.railway.app` are different sites (they are on
+the Public Suffix List): login works, but every reload would end the session.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
