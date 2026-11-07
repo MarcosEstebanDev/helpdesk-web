@@ -51,6 +51,18 @@ línea que el servidor). Node 24, pnpm 11.
 - Errores de la API en formato RFC 7807 (`application/problem+json`) con un
   `code` estable: mapear por `code`, no por el texto del mensaje.
 
+## Despliegue (2026-11-07)
+
+Plan gratis: este repo en **Vercel** (`app.<nombre>.is-a.dev`), la API en Render.
+`package.json` fija `packageManager: pnpm@11.13.1` y `engines.node: 24.x`; en
+Vercel hay que poner `ENABLE_EXPERIMENTAL_COREPACK=1` y `NEXT_PUBLIC_API_URL`
+(se inlinea en el build). El CI ya no le pasa `version` a `pnpm/action-setup`
+(falla si también hay `packageManager`). `output: "standalone"` se queda: lo
+usa el Dockerfile y Vercel lo ignora. Pasos en `helpdesk-api/docs/DEPLOY.md`.
+
+Nota vieja corregida: `feat/members-endpoint` del backend YA está en `dev` y en
+`main` (se mergeó el 2026-09-10); lo de "sin mergear" de más abajo es historia.
+
 ## Estado actual (2026-09-09)
 
 **Fases 1, 2, 4, 6 y 7 (cliente) — CERRADAS.** El frontend ya se usa de punta a
