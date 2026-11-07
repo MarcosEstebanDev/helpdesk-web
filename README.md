@@ -160,8 +160,12 @@ run` time has no effect on the bundle the browser receives.
 
 ## Deployment
 
-Deployed on Railway with `railway.json` (Dockerfile build, healthcheck on
-`/login`). The full guide covers both repos and lives in the backend:
+The preferred target is free: **Vercel** for this app (Next.js detected as is;
+`packageManager` and `engines` in `package.json` pin pnpm 11 and Node 24, with
+`ENABLE_EXPERIMENTAL_COREPACK=1` set in the project), the API on Render and
+Postgres on Neon. `railway.json` (Dockerfile build, healthcheck on `/login`)
+stays as the paid fallback. The full guide covers both repos and lives in the
+backend:
 [`helpdesk-api/docs/DEPLOY.md`](https://github.com/MarcosEstebanDev/helpdesk-api/blob/main/docs/DEPLOY.md).
 
 One constraint shapes it: the refresh cookie is `SameSite=Lax`, so the front and
