@@ -16,6 +16,7 @@ import { useAvisos } from '@/components/ui/toast';
 import { useSession } from '@/features/auth/session';
 import { crearDirectorio, type Directorio } from '@/features/members/directory';
 import { useMembers } from '@/features/members/queries';
+import { AiTriagePanel } from '@/features/tickets/components/ai-triage-card';
 import { AssigneePicker } from '@/features/tickets/components/assignee-picker';
 import { SlaPanel } from '@/features/tickets/components/sla-panel';
 import { TicketActivity } from '@/features/tickets/components/ticket-activity';
@@ -126,6 +127,11 @@ export default function TicketDetailPage() {
             ticket={ticket}
             esAgente={esAgente}
             directorio={directorio}
+          />
+          <AiTriagePanel
+            ticketId={ticket.id}
+            prioridadActual={ticket.priority}
+            esAgente={esAgente}
           />
           <section className="space-y-2">
             <h2 className="px-1 text-xs font-semibold text-muted-foreground">

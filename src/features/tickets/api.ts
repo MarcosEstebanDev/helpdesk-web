@@ -1,4 +1,4 @@
-import { apiFetch } from '@/lib/api/client';
+import { ApiError, apiFetch } from '@/lib/api/client';
 import type {
   AuditEntry,
   TicketDetail,
@@ -6,6 +6,7 @@ import type {
   TicketPriority,
   TicketStatus,
   TicketSummary,
+  TicketTriage,
 } from '@/lib/api/types';
 
 export interface ListTicketsParams {
@@ -34,6 +35,20 @@ export function getTicket(ticketId: string): Promise<TicketDetail> {
 /** Solo AGENT o superior: el rastro de auditoría no es para el solicitante. */
 export function getHistory(ticketId: string): Promise<AuditEntry[]> {
   return apiFetch<AuditEntry[]>(`/tickets/${ticketId}/history`);
+}
+
+/**
+ * Solo AGENT o superior. Un 404 NO es un error para la pantalla: significa que
+ * no hay sugerencia (la IA esta apagada o el ticket es anterior a ella), y se
+ * devuelve `null` para que la tarjeta lo diga en vez de pintar un fallo.
+ */
+export async function getTriage(ticketId: string): Promise<TicketTriage | null> {
+  try {
+    return await apiFetch<TicketTriage>(`/tickets/${ticketId}/triage`);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  }
 }
 
 export function createTicket(input: {

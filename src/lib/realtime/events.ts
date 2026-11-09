@@ -50,6 +50,12 @@ export interface SlaBreachedMessage extends MensajeBase {
   assigneeId: string | null;
 }
 
+/** Solo llega a AGENT o ADMIN: la sugerencia de la IA es para el equipo. */
+export interface TicketTriagedMessage extends MensajeBase {
+  category: string;
+  suggestedPriority: string;
+}
+
 /** Mapa de nombre de evento a su payload. */
 export interface RealtimeEvents {
   'ticket.created': TicketCreatedMessage;
@@ -58,6 +64,7 @@ export interface RealtimeEvents {
   'ticket.assigned': TicketAssignmentMessage;
   'ticket.unassigned': TicketAssignmentMessage;
   'sla.breached': SlaBreachedMessage;
+  'ticket.triaged': TicketTriagedMessage;
 }
 
 export type RealtimeEventName = keyof RealtimeEvents;

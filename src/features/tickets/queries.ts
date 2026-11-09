@@ -57,6 +57,24 @@ export function useTicketHistory(ticketId: string, habilitado: boolean) {
 }
 
 /**
+ * Sugerencia de la IA. La actualiza el evento `ticket.triaged` del WebSocket;
+ * ademas, MIENTRAS esta `pending`, se vuelve a pedir cada 5 s. No es
+ * desconfianza del socket: si esta caido, la tarjeta se quedaria en
+ * "Analizando" para siempre. En cuanto llega `ready` o `null`, deja de consultar.
+ */
+export function useTicketTriage(ticketId: string, habilitado: boolean) {
+  return useQuery({
+    queryKey: ticketKeys.triage(ticketId),
+    queryFn: () => api.getTriage(ticketId),
+    enabled: habilitado,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'pending' ? 5_000 : false,
+    retry: (intentos, error) =>
+      !(error instanceof ApiError && error.status < 500) && intentos < 1,
+  });
+}
+
+/**
  * Las mutaciones invalidan igual que lo haría el WebSocket.
  *
  * Es redundante a propósito: el evento de realtime llega por el outbox, o sea

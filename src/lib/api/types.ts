@@ -174,3 +174,27 @@ export interface EffectiveSlaTarget {
   /** `default` = el valor de fábrica; `organization` = pactado por el tenant. */
   source: 'default' | 'organization';
 }
+
+/**
+ * Sugerencia de la IA para un ticket (`GET /tickets/:id/triage`, ADR-0027).
+ *
+ * Es una SUGERENCIA: nunca cambia la prioridad real del ticket. `pending`
+ * significa que la cola todavia no la proceso; un 404 (IA apagada o ticket
+ * anterior a la IA) se traduce a `null` en `getTriage`.
+ *
+ * `category`, `sentiment` y `language` van como `string` y no como union: el
+ * contrato se mantiene a mano, y una categoria nueva en el backend tiene que
+ * llegar a la pantalla (cruda) en vez de romper el tipo.
+ */
+export type TicketTriage =
+  | { status: 'pending' }
+  | {
+      status: 'ready';
+      category: string;
+      suggestedPriority: TicketPriority;
+      sentiment: string;
+      language: string;
+      model: string;
+      promptVersion: string;
+      triagedAt: string;
+    };

@@ -18,6 +18,7 @@ import type {
   CommentAddedMessage,
   DisconnectedMessage,
   SlaBreachedMessage,
+  TicketTriagedMessage,
   TicketAssignmentMessage,
   TicketCreatedMessage,
   TicketStatusChangedMessage,
@@ -174,6 +175,13 @@ export function WsProvider({ children }: { children: ReactNode }) {
     socket.on('sla.breached', (msg: SlaBreachedMessage) => {
       void queryClient.invalidateQueries({ queryKey: ticketKeys.all });
       anotarCambio(msg.ticketId);
+    });
+
+    // Solo la tarjeta de la IA: la sugerencia no cambia nada del ticket.
+    socket.on('ticket.triaged', (msg: TicketTriagedMessage) => {
+      void queryClient.invalidateQueries({
+        queryKey: ticketKeys.triage(msg.ticketId),
+      });
     });
 
     return () => {

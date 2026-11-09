@@ -21,6 +21,10 @@ export const ticketKeys = {
   /** Rastro de auditoría de un ticket (`GET /tickets/:id/history`). */
   history: (ticketId: string) =>
     [...ticketKeys.detail(ticketId), 'history'] as const,
+  /** Sugerencia de la IA (`GET /tickets/:id/triage`). Cuelga del detalle a
+   *  proposito: todo lo que ya invalida el detalle la alcanza. */
+  triage: (ticketId: string) =>
+    [...ticketKeys.detail(ticketId), 'triage'] as const,
 };
 
 /** Configuración de SLA de la organización (`GET /sla-policy`, solo ADMIN). */
