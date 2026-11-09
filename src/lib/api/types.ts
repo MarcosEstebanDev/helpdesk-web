@@ -86,6 +86,12 @@ export interface TicketSummary {
   assigneeId: string | null;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Solo en la BANDEJA y solo para AGENT o superior. Tres significados: la
+   * clave no está (VIEWER, o el detalle), `null` (sin sugerencia todavía) o la
+   * sugerencia. No confundir los dos primeros.
+   */
+  aiTriage?: { category: string; suggestedPriority: TicketPriority } | null;
 }
 
 export interface TicketComment {

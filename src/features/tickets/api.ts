@@ -12,6 +12,9 @@ import type {
 export interface ListTicketsParams {
   status?: TicketStatus;
   assigneeId?: string;
+  requesterId?: string;
+  /** Solo AGENT o superior: tickets donde la IA sugiere más urgencia. */
+  aiSuggestsHigher?: true;
   limit?: number;
   /** Id del último ticket recibido (paginación por cursor, no por offset). */
   cursor?: string;
@@ -21,6 +24,10 @@ export function listTickets(params: ListTicketsParams): Promise<TicketPage> {
   const query = new URLSearchParams();
   if (params.status) query.set('status', params.status);
   if (params.assigneeId) query.set('assigneeId', params.assigneeId);
+  // Faltaba: el filtro "Los que abrí yo" de un VIEWER se armaba bien en
+  // `filtrosDeBandeja` y se perdía acá, así que no filtraba nada.
+  if (params.requesterId) query.set('requesterId', params.requesterId);
+  if (params.aiSuggestsHigher) query.set('aiSuggestsHigher', 'true');
   if (params.limit !== undefined) query.set('limit', String(params.limit));
   if (params.cursor) query.set('cursor', params.cursor);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { Inbox, Plus, UserCheck } from 'lucide-react';
+import { ArrowDown, ArrowUp, Inbox, Plus, Sparkles, UserCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,13 @@ import {
 import { Tooltip } from '@/components/ui/tooltip';
 import { useAvisos } from '@/components/ui/toast';
 import { useSession } from '@/features/auth/session';
+import {
+  CATEGORIA_IA,
+  CATEGORIA_IA_CORTA,
+  PRIORIDAD_IA,
+  direccion,
+  etiqueta,
+} from '@/features/tickets/ai-labels';
 import {
   FechaRelativa,
   PriorityBadge,
@@ -65,6 +72,7 @@ export default function TicketsPage() {
   const { user } = useSession();
   const [estado, setEstado] = useState<TicketStatus | ''>('');
   const [soloMios, setSoloMios] = useState(false);
+  const [soloIaUrgentes, setSoloIaUrgentes] = useState(false);
   const [abriendo, setAbriendo] = useState(false);
 
   // El filtro existe para los tres roles, pero NO significa lo mismo: un agente
@@ -79,6 +87,7 @@ export default function TicketsPage() {
     soloMios,
     miId: user?.id,
     esAgente,
+    soloIaUrgentes,
   });
 
   const {
@@ -126,6 +135,22 @@ export default function TicketsPage() {
           {esAgente ? 'Mis tickets' : 'Los que abrí yo'}
         </Button>
 
+        {/* El valor real del triage para un agente: encontrar el incendio que
+            entró como "normal". Solo existe para el equipo (ADR-0027). */}
+        {esAgente ? (
+          <Button
+            variant="outline"
+            aria-pressed={soloIaUrgentes}
+            onClick={() => setSoloIaUrgentes((v) => !v)}
+            className={cn(
+              soloIaUrgentes && 'border-primary bg-accent text-accent-foreground',
+            )}
+          >
+            <Sparkles />
+            La IA sugiere más urgencia
+          </Button>
+        ) : null}
+
         <Button className="ml-auto" onClick={() => setAbriendo(true)}>
           <Plus />
           Abrir ticket
@@ -157,6 +182,7 @@ export default function TicketsPage() {
           onVerTodos={() => {
             setEstado('');
             setSoloMios(false);
+            setSoloIaUrgentes(false);
           }}
           onAbrir={() => setAbriendo(true)}
         />
@@ -219,6 +245,12 @@ function Fila({ ticket }: { ticket: TicketSummary }) {
       </span>
 
       <span className="flex shrink-0 items-center gap-3 max-sm:w-full max-sm:pl-7">
+        {ticket.aiTriage ? (
+          <SugerenciaIa
+            sugerencia={ticket.aiTriage}
+            prioridadActual={ticket.priority}
+          />
+        ) : null}
         <Asignacion ticket={ticket} miId={user?.id} />
         <StatusBadge status={ticket.status} />
         <span className="w-14 shrink-0 text-right text-xs text-muted-foreground">
@@ -226,6 +258,56 @@ function Fila({ ticket }: { ticket: TicketSummary }) {
         </span>
       </span>
     </Link>
+  );
+}
+
+/**
+ * Lo que dice la IA, en una fila donde no sobra sitio: la categoría corta y,
+ * SOLO si la IA sugiere otra prioridad, una flecha hacia dónde la movería.
+ * Cuando coincide no se dibuja flecha: repetir la prioridad que ya se ve a la
+ * izquierda sería ruido, y el ruido enseña a no mirar.
+ */
+function SugerenciaIa({
+  sugerencia,
+  prioridadActual,
+}: {
+  sugerencia: NonNullable<TicketSummary['aiTriage']>;
+  prioridadActual: TicketPriority;
+}) {
+  const sentido = direccion(prioridadActual, sugerencia.suggestedPriority);
+  const sugerida = etiqueta(PRIORIDAD_IA, sugerencia.suggestedPriority);
+  const descripcion =
+    sentido === 'igual'
+      ? `La IA lo clasifica como ${etiqueta(CATEGORIA_IA, sugerencia.category).toLowerCase()}`
+      : `La IA sugiere prioridad ${sugerida.toLowerCase()} (hoy: ${PRIORIDAD_IA[prioridadActual].toLowerCase()})`;
+
+  return (
+    <Tooltip contenido={descripcion}>
+      <span
+        className="inline-flex items-center gap-1.5"
+        aria-label={descripcion}
+      >
+        <Lozenge tone="neutral">
+          {etiqueta(CATEGORIA_IA_CORTA, sugerencia.category)}
+        </Lozenge>
+        {sentido === 'igual' ? null : (
+          <span
+            className={cn(
+              'inline-flex items-center gap-0.5 text-xs font-semibold',
+              sentido === 'sube' ? 'text-danger-foreground' : 'text-muted-foreground',
+            )}
+          >
+            <Sparkles className="size-3" aria-hidden />
+            {sentido === 'sube' ? (
+              <ArrowUp className="size-3" aria-hidden />
+            ) : (
+              <ArrowDown className="size-3" aria-hidden />
+            )}
+            {sugerida}
+          </span>
+        )}
+      </span>
+    </Tooltip>
   );
 }
 
@@ -301,8 +383,11 @@ function BandejaVacia({
   const porAsignacion = filtros.assigneeId !== undefined;
   const porAutoria = filtros.requesterId !== undefined;
   const porEstado = filtros.status !== undefined;
+  const porIa = filtros.aiSuggestsHigher === true;
 
-  const mensaje = porAsignacion
+  const mensaje = porIa
+    ? 'La IA no ve ningún ticket más urgente de lo que está marcado.'
+    : porAsignacion
     ? porEstado
       ? 'No tenés ningún ticket asignado con ese estado.'
       : 'No tenés ningún ticket asignado.'

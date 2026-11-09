@@ -23,6 +23,8 @@ export type FiltrosDeBandeja = {
   status?: TicketStatus;
   assigneeId?: string;
   requesterId?: string;
+  /** `true` o ausente, nunca `false`: ver la regla de las claves omitidas. */
+  aiSuggestsHigher?: true;
 };
 
 export function filtrosDeBandeja({
@@ -30,12 +32,15 @@ export function filtrosDeBandeja({
   soloMios,
   miId,
   esAgente,
+  soloIaUrgentes = false,
 }: {
   estado: TicketStatus | '';
   soloMios: boolean;
   miId: string | undefined;
   /** Decide QUÉ significa "míos": ver abajo. */
   esAgente: boolean;
+  /** "La IA sugiere más urgencia". Solo cuenta para AGENT o superior. */
+  soloIaUrgentes?: boolean;
 }): FiltrosDeBandeja {
   const filtros: FiltrosDeBandeja = {};
   if (estado !== '') filtros.status = estado;
@@ -49,6 +54,10 @@ export function filtrosDeBandeja({
     if (esAgente) filtros.assigneeId = miId;
     else filtros.requesterId = miId;
   }
+
+  // Para un VIEWER el backend respondería 403: la sugerencia es del equipo. No
+  // se manda en vez de mandarla y mostrar un error que el usuario no provocó.
+  if (soloIaUrgentes && esAgente) filtros.aiSuggestsHigher = true;
 
   return filtros;
 }

@@ -185,11 +185,14 @@ export function WsProvider({ children }: { children: ReactNode }) {
       anotarCambio(msg.ticketId);
     });
 
-    // Solo la tarjeta de la IA: la sugerencia no cambia nada del ticket.
+    // La tarjeta del detalle y la bandeja (que pinta la sugerencia en cada
+    // fila). El detalle del ticket NO: la sugerencia no cambia nada de él.
     socket.on('ticket.triaged', (msg: TicketTriagedMessage) => {
       void queryClient.invalidateQueries({
         queryKey: ticketKeys.triage(msg.ticketId),
       });
+      void queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
+      anotarCambio(msg.ticketId);
       for (const oyente of oyentesDeIa.current) oyente(msg);
     });
 
