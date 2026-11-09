@@ -8,39 +8,14 @@ import {
   FechaRelativa,
   PriorityLabel,
 } from '@/features/tickets/components/ticket-badges';
+import {
+  CATEGORIA_IA,
+  IDIOMA_IA,
+  TONO_IA,
+  etiqueta,
+} from '@/features/tickets/ai-labels';
 import { useTicketTriage } from '@/features/tickets/queries';
 import type { TicketPriority, TicketTriage } from '@/lib/api/types';
-
-const CATEGORIA: Record<string, string> = {
-  account_access: 'Acceso a la cuenta',
-  billing: 'Facturación',
-  bug: 'Error del producto',
-  how_to: 'Consulta de uso',
-  feature_request: 'Pedido de función',
-  other: 'Otro',
-};
-
-const TONO: Record<string, string> = {
-  negative: 'Negativo',
-  neutral: 'Neutral',
-  positive: 'Positivo',
-};
-
-const IDIOMA: Record<string, string> = {
-  es: 'Español',
-  en: 'Inglés',
-  pt: 'Portugués',
-  other: 'Otro idioma',
-};
-
-/**
- * Lo que no esté en el mapa se muestra CRUDO. El contrato se mantiene a mano:
- * una categoría nueva en el backend tiene que verse (fea, pero cierta) en vez
- * de desaparecer o quedar disfrazada de "Otro".
- */
-function traducir(mapa: Record<string, string>, valor: string): string {
-  return mapa[valor] ?? valor;
-}
 
 /** Contenedor: solo pide la sugerencia si quien mira es del equipo. */
 export function AiTriagePanel({
@@ -152,7 +127,7 @@ function Contenido({
     <div className="space-y-3">
       <dl className="space-y-2">
         <Fila etiqueta="Categoría">
-          {traducir(CATEGORIA, estado.category)}
+          {etiqueta(CATEGORIA_IA, estado.category)}
         </Fila>
         <Fila etiqueta="Prioridad">
           <span className="flex flex-wrap items-center gap-x-2">
@@ -165,7 +140,7 @@ function Contenido({
           </span>
         </Fila>
         <Fila etiqueta="Tono">
-          {traducir(TONO, estado.sentiment)} · {traducir(IDIOMA, estado.language)}
+          {etiqueta(TONO_IA, estado.sentiment)} · {etiqueta(IDIOMA_IA, estado.language)}
         </Fila>
       </dl>
       {/* Trazabilidad visible: quien lee sabe que lo dijo una máquina, cuál y

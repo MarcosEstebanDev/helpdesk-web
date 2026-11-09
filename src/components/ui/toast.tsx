@@ -1,7 +1,7 @@
 'use client';
 
 import { Toast } from '@base-ui/react/toast';
-import { CheckCircle2, X, XCircle } from 'lucide-react';
+import { CheckCircle2, Sparkles, X, XCircle } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -53,6 +53,8 @@ function ListaDeAvisos() {
     >
       {aviso.type === 'error' ? (
         <XCircle className="mt-px size-4 shrink-0 text-destructive" aria-hidden />
+      ) : aviso.type === 'ia' ? (
+        <Sparkles className="mt-px size-4 shrink-0 text-accent-foreground" aria-hidden />
       ) : (
         <CheckCircle2
           className="mt-px size-4 shrink-0 text-success-foreground"
@@ -63,6 +65,9 @@ function ListaDeAvisos() {
       <div className="min-w-0 flex-1">
         <Toast.Title className="text-sm font-semibold text-popover-foreground" />
         <Toast.Description className="mt-0.5 text-xs text-muted-foreground" />
+        {aviso.actionProps ? (
+          <Toast.Action className="mt-2 rounded-sm text-xs font-semibold text-accent-foreground hover:underline" />
+        ) : null}
       </div>
 
       <Toast.Close
@@ -82,6 +87,21 @@ export function useAvisos() {
   return {
     exito: (titulo: string, detalle?: string) =>
       add({ title: titulo, description: detalle, type: 'success' }),
+    /** Aviso de algo que hizo la IA, con un acceso directo opcional. */
+    ia: (
+      titulo: string,
+      detalle: string,
+      accion?: { texto: string; alPulsar: () => void },
+    ) =>
+      add({
+        title: titulo,
+        description: detalle,
+        type: 'ia',
+        timeout: 8_000,
+        actionProps: accion
+          ? { children: accion.texto, onClick: accion.alPulsar }
+          : undefined,
+      }),
     error: (titulo: string, detalle?: string) =>
       add({
         title: titulo,

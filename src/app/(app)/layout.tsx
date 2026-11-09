@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Lozenge, Skeleton } from '@/components/ui/primitives';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useLogout, useSession } from '@/features/auth/session';
+import { AiTriageNotifier } from '@/features/tickets/components/ai-triage-notifier';
 import { useTema } from '@/providers/theme-provider';
 import { useWs } from '@/providers/ws-provider';
 import { cn } from '@/lib/utils';
@@ -69,6 +70,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
+      {/* Solo el equipo recibe ticket.triaged (sala staff); para un VIEWER esto no
+          escucha nada, pero ni se monta: la sugerencia no es asunto suyo. */}
+      {rol === 'AGENT' || rol === 'ADMIN' ? <AiTriageNotifier /> : null}
       <TopBar rol={rol} onAbrirMenu={() => setMenuAbierto(true)} />
 
       <div className="flex flex-1">

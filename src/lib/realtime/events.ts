@@ -54,6 +54,10 @@ export interface SlaBreachedMessage extends MensajeBase {
 export interface TicketTriagedMessage extends MensajeBase {
   category: string;
   suggestedPriority: string;
+  /** Opcionales: los eventos anteriores a este campo no los traen. */
+  number?: number;
+  /** Prioridad del ticket AL CLASIFICARLO, no necesariamente la de ahora. */
+  currentPriority?: string;
 }
 
 /** Mapa de nombre de evento a su payload. */
