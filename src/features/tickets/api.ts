@@ -1,6 +1,7 @@
 import { ApiError, apiFetch } from '@/lib/api/client';
 import type {
   AuditEntry,
+  CommentVisibility,
   TicketDetail,
   TicketPage,
   TicketPriority,
@@ -71,11 +72,11 @@ export function createTicket(input: {
 
 export function addComment(
   ticketId: string,
-  body: string,
+  input: { body: string; visibility: CommentVisibility },
 ): Promise<{ id: string }> {
   return apiFetch<{ id: string }>(`/tickets/${ticketId}/comments`, {
     method: 'POST',
-    body: JSON.stringify({ body }),
+    body: JSON.stringify(input),
   });
 }
 

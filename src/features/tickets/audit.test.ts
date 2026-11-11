@@ -43,6 +43,15 @@ describe('papelDelActor', () => {
 });
 
 describe('describirEntrada', () => {
+  it('una nota interna se distingue de un comentario (y lo viejo, sin visibilidad, era público)', () => {
+    const frase = (metadata: AuditEntry['metadata']) =>
+      describirEntrada(entrada({ action: 'comment.added', metadata }), PARTICIPANTES).frase;
+
+    expect(frase({ commentId: 'c1', visibility: 'INTERNAL' })).toBe('Dejó una nota interna');
+    expect(frase({ commentId: 'c1', visibility: 'PUBLIC' })).toBe('Comentó');
+    expect(frase({ commentId: 'c1' })).toBe('Comentó');
+  });
+
   it('un cambio de estado con from y to se lee como una transición', () => {
     const d = describirEntrada(
       entrada({

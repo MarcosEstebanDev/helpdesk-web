@@ -155,7 +155,13 @@ export function describirEntrada(
 
     case 'comment.added':
       // El cuerpo no viaja en el historial, y además está en la otra pestaña.
-      return { papel, frase: 'Comentó' };
+      // Los comentarios anteriores a las notas internas no traen `visibility`
+      // y eran todos públicos.
+      return {
+        papel,
+        frase:
+          meta?.visibility === 'INTERNAL' ? 'Dejó una nota interna' : 'Comentó',
+      };
 
     case 'sla.breached': {
       const kind = comoSlaKind(meta?.kind);
