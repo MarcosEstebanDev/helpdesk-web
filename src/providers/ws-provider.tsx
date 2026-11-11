@@ -18,6 +18,7 @@ import type {
   CommentAddedMessage,
   DisconnectedMessage,
   SlaBreachedMessage,
+  TicketTriagedMessage,
   TicketAssignmentMessage,
   TicketCreatedMessage,
   TicketStatusChangedMessage,
@@ -41,12 +42,19 @@ type WsContextValue = {
    * a la invalidación: los datos siguen viniendo de la API.
    */
   cambiosRecientes: Record<string, number>;
+  /**
+   * Avisa cada vez que la IA clasifica un ticket. Devuelve la función para
+   * darse de baja. Existe para que QUIEN PINTA (el aviso en pantalla) no viva
+   * aquí: este provider solo invalida caché.
+   */
+  alClasificar: (oyente: (msg: TicketTriagedMessage) => void) => () => void;
 };
 
 const WsContext = createContext<WsContextValue>({
   connected: false,
   watchTicket: () => () => {},
   cambiosRecientes: {},
+  alClasificar: () => () => {},
 });
 
 /**
@@ -77,6 +85,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<Socket | null>(null);
   /** Tickets seguidos, con cuántos componentes los están mirando. */
   const watched = useRef(new Map<string, number>());
+  const oyentesDeIa = useRef(new Set<(msg: TicketTriagedMessage) => void>());
 
   /**
    * Anota qué ticket acaba de cambiar, para que la lista pueda señalarlo.
@@ -176,6 +185,17 @@ export function WsProvider({ children }: { children: ReactNode }) {
       anotarCambio(msg.ticketId);
     });
 
+    // La tarjeta del detalle y la bandeja (que pinta la sugerencia en cada
+    // fila). El detalle del ticket NO: la sugerencia no cambia nada de él.
+    socket.on('ticket.triaged', (msg: TicketTriagedMessage) => {
+      void queryClient.invalidateQueries({
+        queryKey: ticketKeys.triage(msg.ticketId),
+      });
+      void queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
+      anotarCambio(msg.ticketId);
+      for (const oyente of oyentesDeIa.current) oyente(msg);
+    });
+
     return () => {
       vivo = false;
       socket.removeAllListeners();
@@ -208,9 +228,19 @@ export function WsProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const alClasificar = useCallback(
+    (oyente: (msg: TicketTriagedMessage) => void) => {
+      oyentesDeIa.current.add(oyente);
+      return () => {
+        oyentesDeIa.current.delete(oyente);
+      };
+    },
+    [],
+  );
+
   const value = useMemo(
-    () => ({ connected, watchTicket, cambiosRecientes }),
-    [connected, watchTicket, cambiosRecientes],
+    () => ({ connected, watchTicket, cambiosRecientes, alClasificar }),
+    [connected, watchTicket, cambiosRecientes, alClasificar],
   );
 
   return <WsContext.Provider value={value}>{children}</WsContext.Provider>;

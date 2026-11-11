@@ -71,4 +71,20 @@ describe('filtrosDeBandeja', () => {
     const claves = [todos, mios, miosAbiertos].map((f) => JSON.stringify(f));
     expect(new Set(claves).size).toBe(3);
   });
+
+  it('"la IA sugiere más urgencia" se manda solo para el equipo', () => {
+    expect(
+      filtrosDeBandeja({ estado: '', soloMios: false, miId: MI_ID, esAgente: true, soloIaUrgentes: true }),
+    ).toEqual({ aiSuggestsHigher: true });
+    // Para un VIEWER el backend respondería 403: no se manda.
+    expect(
+      filtrosDeBandeja({ estado: '', soloMios: false, miId: MI_ID, esAgente: false, soloIaUrgentes: true }),
+    ).toEqual({});
+  });
+
+  it('el filtro de la IA apagado no aparece en la clave (ni como false)', () => {
+    expect(
+      filtrosDeBandeja({ estado: '', soloMios: false, miId: MI_ID, esAgente: true, soloIaUrgentes: false }),
+    ).toEqual({});
+  });
 });
