@@ -19,6 +19,7 @@ import { useMembers } from '@/features/members/queries';
 import { AiTriagePanel } from '@/features/tickets/components/ai-triage-card';
 import { AssigneePicker } from '@/features/tickets/components/assignee-picker';
 import { SlaPanel } from '@/features/tickets/components/sla-panel';
+import { TagEditor } from '@/features/tags/components/tag-editor';
 import { TicketActivity } from '@/features/tickets/components/ticket-activity';
 import {
   FechaRelativa,
@@ -171,6 +172,17 @@ function PanelDetalles({
             directorio={directorio}
           />
         </Dato>
+
+        {/* Clasificación interna (ADR-0031): al cliente ni le llega la clave. */}
+        {esAgente && ticket.tags !== undefined ? (
+          <Dato etiqueta="Etiquetas">
+            <TagEditor
+              ticketId={ticket.id}
+              tags={ticket.tags}
+              cerrado={ticket.status === 'CLOSED'}
+            />
+          </Dato>
+        ) : null}
 
         <Dato etiqueta="Abierto">
           <span className="text-muted-foreground">

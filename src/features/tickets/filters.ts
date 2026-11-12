@@ -25,6 +25,8 @@ export type FiltrosDeBandeja = {
   requesterId?: string;
   /** `true` o ausente, nunca `false`: ver la regla de las claves omitidas. */
   aiSuggestsHigher?: true;
+  /** Etiquetas, ORDENADAS: el mismo conjunto tiene que ser la misma clave. */
+  tagIds?: string[];
 };
 
 export function filtrosDeBandeja({
@@ -33,6 +35,7 @@ export function filtrosDeBandeja({
   miId,
   esAgente,
   soloIaUrgentes = false,
+  etiquetas = [],
 }: {
   estado: TicketStatus | '';
   soloMios: boolean;
@@ -41,6 +44,8 @@ export function filtrosDeBandeja({
   esAgente: boolean;
   /** "La IA sugiere más urgencia". Solo cuenta para AGENT o superior. */
   soloIaUrgentes?: boolean;
+  /** Ids de etiquetas: "al menos una de" (ADR-0031). Solo para el equipo. */
+  etiquetas?: string[];
 }): FiltrosDeBandeja {
   const filtros: FiltrosDeBandeja = {};
   if (estado !== '') filtros.status = estado;
@@ -58,6 +63,11 @@ export function filtrosDeBandeja({
   // Para un VIEWER el backend respondería 403: la sugerencia es del equipo. No
   // se manda en vez de mandarla y mostrar un error que el usuario no provocó.
   if (soloIaUrgentes && esAgente) filtros.aiSuggestsHigher = true;
+
+  // Mismo criterio: las etiquetas son del equipo. Vacío se omite (regla de las
+  // claves omitidas) y el orden se normaliza, porque elegir A y después B o B y
+  // después A es el mismo filtro y no debe partir la caché en dos.
+  if (esAgente && etiquetas.length > 0) filtros.tagIds = [...etiquetas].sort();
 
   return filtros;
 }

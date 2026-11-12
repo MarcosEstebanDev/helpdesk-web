@@ -16,6 +16,8 @@ export interface ListTicketsParams {
   requesterId?: string;
   /** Solo AGENT o superior: tickets donde la IA sugiere más urgencia. */
   aiSuggestsHigher?: true;
+  /** Solo AGENT o superior: tickets con al menos una (ADR-0031). */
+  tagIds?: string[];
   limit?: number;
   /** Id del último ticket recibido (paginación por cursor, no por offset). */
   cursor?: string;
@@ -29,6 +31,8 @@ export function listTickets(params: ListTicketsParams): Promise<TicketPage> {
   // `filtrosDeBandeja` y se perdía acá, así que no filtraba nada.
   if (params.requesterId) query.set('requesterId', params.requesterId);
   if (params.aiSuggestsHigher) query.set('aiSuggestsHigher', 'true');
+  // `append` y no `set`: el backend espera `?tagId=a&tagId=b`.
+  for (const tagId of params.tagIds ?? []) query.append('tagId', tagId);
   if (params.limit !== undefined) query.set('limit', String(params.limit));
   if (params.cursor) query.set('cursor', params.cursor);
 
