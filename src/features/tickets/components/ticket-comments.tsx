@@ -1,10 +1,16 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, Lozenge, Textarea } from '@/components/ui/primitives';
 import { useAvisos } from '@/components/ui/toast';
 import { useSession } from '@/features/auth/session';
+import {
+  CannedResponsePicker,
+  insertAtCursor,
+} from '@/features/canned-responses/components/canned-response-picker';
+import { fillTemplate, hasUnfilledPlaceholder } from '@/features/canned-responses/fill';
+import { useCannedResponses } from '@/features/canned-responses/queries';
 import { etiquetaDelActor, papelDelActor } from '@/features/tickets/audit';
 import { FechaRelativa } from '@/features/tickets/components/ticket-badges';
 import { useAddComment } from '@/features/tickets/queries';
@@ -12,6 +18,7 @@ import { ApiError } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
 import type { Directorio } from '@/features/members/directory';
 import type {
+  CannedResponse,
   CommentVisibility,
   TicketComment,
   TicketDetail,
@@ -30,6 +37,12 @@ import type {
  * por color en el editor Y en el hilo, porque el error caro es mandarle al
  * cliente algo que era interno. El cliente no ve el selector, y no le llega
  * ninguna nota: eso lo filtra el backend, no esta pantalla.
+ *
+ * **Respuestas predefinidas (ADR-0030 del backend).** Solo el equipo. Se eligen
+ * con el botón "Respuestas" o con `/` en el editor vacío, y se insertan YA
+ * rellenadas en el cursor, editables. Si al responderle al cliente queda una
+ * variable sin rellenar, el envío pide una segunda confirmación (un estado del
+ * formulario, no un `confirm()`); en una nota interna no, porque no le llega.
  */
 export function TicketComments({
   ticket,
@@ -48,11 +61,49 @@ export function TicketComments({
   // Si el rol cambia (otra sesión), un VIEWER nunca manda una nota por un
   // estado que quedó de antes: el backend la rechazaría con 403.
   const nota = esEquipo && visibilidad === 'INTERNAL';
+  const editor = useRef<HTMLTextAreaElement>(null);
+  const [selectorAbierto, setSelectorAbierto] = useState(false);
+  /** Se intentó mandar al cliente con una variable sin rellenar. */
+  const [pidiendoConfirmacion, setPidiendoConfirmacion] = useState(false);
+  const plantillas = useCannedResponses(esEquipo);
 
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
+  function cambiarTexto(valor: string) {
+    setTexto(valor);
+    // Lo confirmado era OTRO texto: si cambia, se vuelve a preguntar.
+    setPidiendoConfirmacion(false);
+  }
+
+  function insertarPlantilla(plantilla: CannedResponse) {
+    const relleno = fillTemplate(plantilla.body, {
+      ticketNumber: ticket.number,
+      subject: ticket.subject,
+      customerEmail: directorio(ticket.requesterId)?.email ?? null,
+      agentEmail: user?.email ?? null,
+    });
+    const el = editor.current;
+    const inicio = el?.selectionStart ?? texto.length;
+    const fin = el?.selectionEnd ?? texto.length;
+    const { text, cursor } = insertAtCursor(texto, relleno, inicio, fin);
+    cambiarTexto(text);
+    // Después del render: el diálogo devuelve el foco a su disparador, y el
+    // agente quiere seguir escribiendo donde quedó la plantilla.
+    requestAnimationFrame(() => {
+      editor.current?.focus();
+      editor.current?.setSelectionRange(cursor, cursor);
+    });
+  }
+
+  function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (esEquipo && e.key === '/' && texto === '') {
+      e.preventDefault();
+      setSelectorAbierto(true);
+    }
+  }
+
+  function enviar() {
     const cuerpo = texto.trim();
     if (cuerpo === '') return;
+    setPidiendoConfirmacion(false);
     comentar.mutate(
       { body: cuerpo, visibility: nota ? 'INTERNAL' : 'PUBLIC' },
       {
@@ -64,6 +115,16 @@ export function TicketComments({
           ),
       },
     );
+  }
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (texto.trim() === '') return;
+    if (!nota && hasUnfilledPlaceholder(texto)) {
+      setPidiendoConfirmacion(true);
+      return;
+    }
+    enviar();
   }
 
   return (
@@ -92,12 +153,25 @@ export function TicketComments({
       ) : (
         <form onSubmit={onSubmit} className="space-y-2">
           {esEquipo ? (
-            <SelectorVisibilidad valor={visibilidad} onChange={setVisibilidad} />
+            <div className="flex items-center justify-between gap-2">
+              <SelectorVisibilidad valor={visibilidad} onChange={setVisibilidad} />
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelectorAbierto(true)}
+                title="Respuestas predefinidas (o «/» con el editor vacío)"
+              >
+                Respuestas
+              </Button>
+            </div>
           ) : null}
           <Textarea
+            ref={editor}
             rows={3}
             value={texto}
-            onChange={(e) => setTexto(e.target.value)}
+            onChange={(e) => cambiarTexto(e.target.value)}
+            onKeyDown={onKeyDown}
             placeholder={
               nota
                 ? 'Solo la ve el equipo. El cliente no recibe nada.'
@@ -106,6 +180,18 @@ export function TicketComments({
             aria-label={nota ? 'Nota interna' : 'Respuesta'}
             className={cn(nota && 'border-warning-foreground/40 bg-warning')}
           />
+          {pidiendoConfirmacion ? (
+            <p
+              role="alert"
+              className="flex flex-wrap items-center gap-2 rounded-md border border-warning-foreground/40 bg-warning px-3 py-2 text-xs text-warning-foreground"
+            >
+              Quedó una variable sin rellenar (algo entre {'{{'} y {'}}'}). El
+              cliente la va a ver tal cual.
+              <Button type="button" size="sm" variant="ghost" onClick={enviar}>
+                Enviar igual
+              </Button>
+            </p>
+          ) : null}
           <Button
             type="submit"
             size="sm"
@@ -117,6 +203,15 @@ export function TicketComments({
                 ? 'Guardar nota'
                 : 'Responder'}
           </Button>
+          {esEquipo ? (
+            <CannedResponsePicker
+              abierto={selectorAbierto}
+              onAbiertoChange={setSelectorAbierto}
+              respuestas={plantillas.data?.items}
+              cargando={plantillas.isPending}
+              onElegir={insertarPlantilla}
+            />
+          ) : null}
         </form>
       )}
     </div>

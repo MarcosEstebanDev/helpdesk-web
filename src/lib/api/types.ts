@@ -76,6 +76,30 @@ export interface MemberList {
   items: Member[];
 }
 
+// ------------------------------------------------- respuestas predefinidas
+
+/**
+ * Respuesta predefinida de la organización (ADR-0030 del backend). La lee el
+ * equipo (AGENT o superior) y la escribe el ADMIN. Las variables las rellena el
+ * front al insertarla (`features/canned-responses/fill.ts`).
+ */
+export interface CannedResponse {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CannedResponseList {
+  items: CannedResponse[];
+}
+
+export interface CannedResponseInput {
+  title: string;
+  body: string;
+}
+
 // ---------------------------------------------------------------- tickets
 
 export interface TicketSummary {

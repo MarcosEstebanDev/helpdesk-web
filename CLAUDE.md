@@ -63,6 +63,23 @@ usa el Dockerfile y Vercel lo ignora. Pasos en `helpdesk-api/docs/DEPLOY.md`.
 Nota vieja corregida: `feat/members-endpoint` del backend YA está en `dev` y en
 `main` (se mergeó el 2026-09-10); lo de "sin mergear" de más abajo es historia.
 
+## Respuestas predefinidas (2026-11-12, ADR-0030 del backend)
+
+Rama `feat/respuestas-predefinidas`.
+
+- `features/canned-responses/`: `api.ts`, `queries.ts` (`useCannedResponses(habilitado)`
+  — un VIEWER ni la pide, el backend le da 403), `fill.ts` y el selector.
+- **`fill.ts` repite la regla de variables del backend** (`template-variables.ts`).
+  Si cambia allí, cambia acá. Relleno en UNA pasada; email vacío o `null` deja
+  la variable literal.
+- Editor del ticket: botón "Respuestas" y `/` con el editor vacío; inserta en el
+  cursor. Con una variable sin rellenar, "Responder al cliente" pide "Enviar
+  igual" (estado del formulario, nunca `confirm()`); la nota interna no.
+- `/settings/respuestas` solo ADMIN (nav con `soloAdmin`). Borrar confirma en la
+  propia fila.
+- **Arreglado:** la sesión recuperada por refresh ahora toma `email` de
+  `/auth/me` (antes quedaba `''`).
+
 ## Esperando al cliente (2026-11-12, ADR-0029 del backend)
 
 Rama `feat/esperando-al-cliente` (sale de `dev`, sin mergear ni pushear).

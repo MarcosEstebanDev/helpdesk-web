@@ -27,6 +27,15 @@ export const ticketKeys = {
     [...ticketKeys.detail(ticketId), 'triage'] as const,
 };
 
+/**
+ * Respuestas predefinidas (`GET /canned-responses`, AGENT o superior). Las
+ * invalida su propia pantalla de configuración al guardar: el backend no emite
+ * ningún evento por ellas.
+ */
+export const cannedResponseKeys = {
+  all: ['canned-responses'] as const,
+};
+
 /** Configuración de SLA de la organización (`GET /sla-policy`, solo ADMIN). */
 export const slaKeys = {
   policy: ['sla', 'policy'] as const,

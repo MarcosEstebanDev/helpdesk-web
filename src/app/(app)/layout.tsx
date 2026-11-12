@@ -4,6 +4,7 @@ import {
   Inbox,
   LogOut,
   Menu,
+  MessageSquareText,
   Monitor,
   Moon,
   Sun,
@@ -226,6 +227,12 @@ interface Destino {
 const DESTINOS: Destino[] = [
   { href: '/tickets', etiqueta: 'Tickets', icono: Inbox },
   { href: '/settings/sla', etiqueta: 'SLA', icono: Timer, soloAdmin: true },
+  {
+    href: '/settings/respuestas',
+    etiqueta: 'Respuestas',
+    icono: MessageSquareText,
+    soloAdmin: true,
+  },
 ];
 
 function NavLateral({
