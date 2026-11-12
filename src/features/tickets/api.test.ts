@@ -29,4 +29,13 @@ describe('listTickets', () => {
 
     expect(apiFetch).toHaveBeenLastCalledWith('/tickets?tagId=a&tagId=b');
   });
+
+  it('manda la búsqueda como q', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce({ items: [], nextCursor: null });
+
+    await listTickets({ q: 'pdf en blanco' });
+
+    expect(apiFetch).toHaveBeenLastCalledWith('/tickets?q=pdf+en+blanco');
+  });
 });
+

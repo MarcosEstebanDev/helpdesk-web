@@ -63,6 +63,15 @@ usa el Dockerfile y Vercel lo ignora. Pasos en `helpdesk-api/docs/DEPLOY.md`.
 Nota vieja corregida: `feat/members-endpoint` del backend YA está en `dev` y en
 `main` (se mergeó el 2026-09-10); lo de "sin mergear" de más abajo es historia.
 
+## Búsqueda (2026-11-13, ADR-0032 del backend)
+
+Rama `feat/busqueda` (entrega 2 de 3). Caja "Buscar… (o #123)" en la bandeja;
+`useDebounced` (`src/lib/use-debounced.ts`, 300 ms) para no pedir en cada
+tecla. `q` va RECORTADO en la clave de caché y se omite si está vacío. Para
+todos los roles: el backend decide qué comentarios cuentan (al cliente no le
+cuentan las notas internas). El backend devuelve como mucho las 1000
+coincidencias más recientes.
+
 ## Etiquetas (2026-11-12, ADR-0031 del backend)
 
 Rama `feat/etiquetas-busqueda-vistas` (entrega 1 de 3: después búsqueda y

@@ -105,5 +105,23 @@ describe('filtrosDeBandeja', () => {
       expect(filtrosDeBandeja({ ...base, esAgente: false, etiquetas: ['a'] })).toEqual({});
     });
   });
+
+  describe('búsqueda (ADR-0032)', () => {
+    const base = { estado: '' as const, soloMios: false, miId: MI_ID, esAgente: false };
+
+    it('el texto va recortado en la clave', () => {
+      expect(filtrosDeBandeja({ ...base, busqueda: '  pdf blanco ' })).toEqual({
+        q: 'pdf blanco',
+      });
+    });
+
+    it('vacío o solo espacios se omite (misma clave que "sin filtros")', () => {
+      expect(filtrosDeBandeja({ ...base, busqueda: '   ' })).toEqual({});
+    });
+
+    it('vale para cualquier rol: el backend decide qué comentarios cuentan', () => {
+      expect(filtrosDeBandeja({ ...base, esAgente: false, busqueda: 'x' }).q).toBe('x');
+    });
+  });
 });
 

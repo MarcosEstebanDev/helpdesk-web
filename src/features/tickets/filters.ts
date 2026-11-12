@@ -27,6 +27,8 @@ export type FiltrosDeBandeja = {
   aiSuggestsHigher?: true;
   /** Etiquetas, ORDENADAS: el mismo conjunto tiene que ser la misma clave. */
   tagIds?: string[];
+  /** Texto libre (ADR-0032), recortado. */
+  q?: string;
 };
 
 export function filtrosDeBandeja({
@@ -36,6 +38,7 @@ export function filtrosDeBandeja({
   esAgente,
   soloIaUrgentes = false,
   etiquetas = [],
+  busqueda = '',
 }: {
   estado: TicketStatus | '';
   soloMios: boolean;
@@ -46,6 +49,9 @@ export function filtrosDeBandeja({
   soloIaUrgentes?: boolean;
   /** Ids de etiquetas: "al menos una de" (ADR-0031). Solo para el equipo. */
   etiquetas?: string[];
+  /** Texto de la caja de búsqueda. Para todos los roles: el backend decide
+   *  qué comentarios cuentan (al cliente no le cuentan las notas internas). */
+  busqueda?: string;
 }): FiltrosDeBandeja {
   const filtros: FiltrosDeBandeja = {};
   if (estado !== '') filtros.status = estado;
@@ -68,6 +74,10 @@ export function filtrosDeBandeja({
   // claves omitidas) y el orden se normaliza, porque elegir A y después B o B y
   // después A es el mismo filtro y no debe partir la caché en dos.
   if (esAgente && etiquetas.length > 0) filtros.tagIds = [...etiquetas].sort();
+
+  // Recortado: "pdf" y "pdf " son la misma búsqueda y la misma clave.
+  const q = busqueda.trim();
+  if (q !== '') filtros.q = q;
 
   return filtros;
 }
