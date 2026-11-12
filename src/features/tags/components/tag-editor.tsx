@@ -112,7 +112,10 @@ export function TagEditor({
             disabled={ocupado}
             className="h-7 text-xs"
           />
-          {consulta !== '' ? (
+          {/* Mientras algo se guarda, sin opciones: elegir otra en ese momento
+              mandaba después un conjunto viejo que la pisaba (y "Crear" se podía
+              pulsar dos veces). Los botones de quitar ya se deshabilitan igual. */}
+          {consulta !== '' && !ocupado ? (
             <ul
               id={listaId}
               role="listbox"

@@ -104,4 +104,25 @@ describe('TagEditor (ADR-0031)', () => {
     expect(screen.queryByLabelText('Agregar etiqueta')).toBeNull();
     expect(screen.queryByRole('button', { name: /Quitar/ })).toBeNull();
   });
+
+  it('mientras crea, las opciones no se pueden usar (no pisa con un conjunto viejo)', async () => {
+    // Revisión final: con "Crear" pendiente se podía elegir otra sugerencia;
+    // el `onSuccess` del create mandaba después el conjunto VIEJO y la borraba.
+    let resolver: (t: Tag) => void = () => {};
+    vi.mocked(createTag).mockReturnValue(
+      new Promise<Tag>((r) => {
+        resolver = r;
+      }),
+    );
+    montar([BUG]);
+
+    await userEvent.type(screen.getByLabelText('Agregar etiqueta'), 'fa');
+    await userEvent.click(await screen.findByRole('option', { name: 'Crear «fa»' }));
+
+    expect(screen.queryByRole('listbox')).toBeNull();
+    resolver({ id: 'fa', name: 'fa', color: 'gray' });
+    await waitFor(() => expect(setTicketTags).toHaveBeenCalledWith('tk1', ['bug', 'fa']));
+    expect(createTag).toHaveBeenCalledTimes(1);
+  });
 });
+
