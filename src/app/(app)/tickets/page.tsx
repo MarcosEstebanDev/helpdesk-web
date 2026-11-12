@@ -52,6 +52,7 @@ import {
   filtrosDeVistaAEstado,
 } from '@/features/views/mapping';
 import { useViews } from '@/features/views/queries';
+import { resolverVista } from '@/features/views/resolve';
 import { TagLozenge } from '@/features/tags/components/tag-lozenge';
 import { useCreateTicket, useTickets } from '@/features/tickets/queries';
 import { ApiError } from '@/lib/api/client';
@@ -109,31 +110,33 @@ function BandejaConVista() {
   const esEquipo = user?.role === 'AGENT' || user?.role === 'ADMIN';
   const vistaId = useSearchParams().get('vista');
   const vistas = useViews(esEquipo && vistaId !== null);
+  const resuelta = resolverVista(vistaId, esEquipo, vistas);
 
-  if (vistaId !== null && esEquipo && vistas.isPending) {
+  if (resuelta.tipo === 'cargando') {
     return <Skeleton className="h-64 w-full rounded-lg" />;
   }
-  const vista =
-    vistaId === null
-      ? null
-      : (vistas.data?.items.find((v) => v.id === vistaId) ?? null);
-
   return (
     <Bandeja
-      key={vistaId ?? 'todas'}
-      vista={vista}
-      vistaPerdida={vistaId !== null && vista === null}
+      key={resuelta.key}
+      vista={resuelta.vista}
+      aviso={
+        resuelta.tipo === 'perdida'
+          ? 'Esa vista ya no existe. Se muestran todos los tickets.'
+          : resuelta.tipo === 'error'
+            ? 'No se pudo cargar la vista. Se muestran todos los tickets.'
+            : null
+      }
     />
   );
 }
 
 function Bandeja({
   vista,
-  vistaPerdida,
+  aviso,
 }: {
   vista: SavedView | null;
-  /** Se abrió `?vista=` de una que ya no existe (o no es visible): se muestra todo. */
-  vistaPerdida: boolean;
+  /** Por qué no se aplicó la vista pedida (no existe o no se pudo cargar). */
+  aviso: string | null;
 }) {
   const { user } = useSession();
   const inicial = vista === null ? null : filtrosDeVistaAEstado(vista.filters);
@@ -266,9 +269,9 @@ function Bandeja({
         </Button>
       </div>
 
-      {vistaPerdida ? (
+      {aviso !== null ? (
         <p role="status" className="text-sm text-muted-foreground">
-          Esa vista ya no existe. Se muestran todos los tickets.
+          {aviso}
         </p>
       ) : null}
 
