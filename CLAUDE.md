@@ -63,6 +63,24 @@ usa el Dockerfile y Vercel lo ignora. Pasos en `helpdesk-api/docs/DEPLOY.md`.
 Nota vieja corregida: `feat/members-endpoint` del backend YA está en `dev` y en
 `main` (se mergeó el 2026-09-10); lo de "sin mergear" de más abajo es historia.
 
+## Etiquetas (2026-11-12, ADR-0031 del backend)
+
+Rama `feat/etiquetas-busqueda-vistas` (entrega 1 de 3: después búsqueda y
+vistas guardadas).
+
+- `features/tags/`: `api.ts`, `queries.ts` (`useTags(habilitado)`; renombrar o
+  borrar invalida `tagKeys.all` Y `ticketKeys.all`, porque el backend no
+  emite un evento por ticket), `tag-lozenge` (paleta de 8 → clases de
+  Tailwind con variante `dark:`; un color desconocido cae en gris),
+  `tag-editor` (detalle; autocompleta y ofrece "Crear «x»") y `tag-filter`
+  (bandeja; menú de casillas que no se cierra al marcar).
+- **Clasificación interna:** el VIEWER no recibe la clave `tags`; todo se
+  monta solo para el equipo y `filtrosDeBandeja` no manda `tagIds` a un
+  VIEWER. `tagIds` va ORDENADO en la clave de caché.
+- Historial: "Agregó la etiqueta X; quitó las etiquetas Y y Z", con el nombre
+  que tenía entonces.
+- `/settings/etiquetas` solo ADMIN (renombrar, color, borrar con aviso).
+
 ## Respuestas predefinidas (2026-11-12, ADR-0030 del backend)
 
 Rama `feat/respuestas-predefinidas`.

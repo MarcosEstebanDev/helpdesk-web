@@ -8,6 +8,7 @@ import {
   Monitor,
   Moon,
   Sun,
+  Tags,
   Timer,
   X,
 } from 'lucide-react';
@@ -227,6 +228,7 @@ interface Destino {
 const DESTINOS: Destino[] = [
   { href: '/tickets', etiqueta: 'Tickets', icono: Inbox },
   { href: '/settings/sla', etiqueta: 'SLA', icono: Timer, soloAdmin: true },
+  { href: '/settings/etiquetas', etiqueta: 'Etiquetas', icono: Tags, soloAdmin: true },
   {
     href: '/settings/respuestas',
     etiqueta: 'Respuestas',
