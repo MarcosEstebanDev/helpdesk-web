@@ -76,6 +76,32 @@ export interface MemberList {
   items: Member[];
 }
 
+// --------------------------------------------------------------- etiquetas
+
+/** Paleta cerrada del backend (ADR-0031). Los tonos los decide `tag-lozenge`. */
+export const TAG_COLORS = [
+  'gray',
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'teal',
+  'blue',
+  'purple',
+] as const;
+export type TagColor = (typeof TAG_COLORS)[number];
+
+/** Etiqueta del catálogo. Clasificación INTERNA: solo la ve el equipo. */
+export interface Tag {
+  id: string;
+  name: string;
+  color: TagColor;
+}
+
+export interface TagList {
+  items: Tag[];
+}
+
 // ------------------------------------------------- respuestas predefinidas
 
 /**
@@ -119,6 +145,11 @@ export interface TicketSummary {
    * sugerencia. No confundir los dos primeros.
    */
   aiTriage?: { category: string; suggestedPriority: TicketPriority } | null;
+  /**
+   * Etiquetas (ADR-0031 del backend). Solo llegan al equipo: para un VIEWER la
+   * clave no existe, no viene vacía.
+   */
+  tags?: Tag[];
 }
 
 /**
@@ -184,6 +215,7 @@ export const AUDIT_ACTIONS = [
   'comment.added',
   'sla.breached',
   'sla.policy_changed',
+  'ticket.tags_changed',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

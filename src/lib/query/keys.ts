@@ -28,6 +28,15 @@ export const ticketKeys = {
 };
 
 /**
+ * Catálogo de etiquetas (`GET /tags`, AGENT o superior). Renombrar o borrar
+ * una etiqueta cambia también cómo se pintan los tickets: quien la cambia
+ * invalida esto Y `ticketKeys.all`.
+ */
+export const tagKeys = {
+  all: ['tags'] as const,
+};
+
+/**
  * Respuestas predefinidas (`GET /canned-responses`, AGENT o superior). Las
  * invalida su propia pantalla de configuración al guardar: el backend no emite
  * ningún evento por ellas.

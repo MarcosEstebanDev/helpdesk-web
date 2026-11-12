@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getTriage } from './api';
+import { getTriage, listTickets } from './api';
 import { ApiError, apiFetch } from '@/lib/api/client';
 
 vi.mock('@/lib/api/client', async (original) => ({
@@ -18,5 +18,15 @@ describe('getTriage', () => {
     vi.mocked(apiFetch).mockRejectedValueOnce(new ApiError(403, 'Forbidden'));
 
     await expect(getTriage('t1')).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe('listTickets', () => {
+  it('manda cada etiqueta como un tagId repetido', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce({ items: [], nextCursor: null });
+
+    await listTickets({ tagIds: ['a', 'b'] });
+
+    expect(apiFetch).toHaveBeenLastCalledWith('/tickets?tagId=a&tagId=b');
   });
 });

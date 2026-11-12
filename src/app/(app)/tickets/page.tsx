@@ -35,6 +35,8 @@ import {
   hayFiltros,
   type FiltrosDeBandeja,
 } from '@/features/tickets/filters';
+import { TagFilter } from '@/features/tags/components/tag-filter';
+import { TagLozenge } from '@/features/tags/components/tag-lozenge';
 import { useCreateTicket, useTickets } from '@/features/tickets/queries';
 import { ApiError } from '@/lib/api/client';
 import { useWs } from '@/providers/ws-provider';
@@ -74,6 +76,7 @@ export default function TicketsPage() {
   const [estado, setEstado] = useState<TicketStatus | ''>('');
   const [soloMios, setSoloMios] = useState(false);
   const [soloIaUrgentes, setSoloIaUrgentes] = useState(false);
+  const [etiquetas, setEtiquetas] = useState<string[]>([]);
   const [abriendo, setAbriendo] = useState(false);
 
   // El filtro existe para los tres roles, pero NO significa lo mismo: un agente
@@ -89,6 +92,7 @@ export default function TicketsPage() {
     miId: user?.id,
     esAgente,
     soloIaUrgentes,
+    etiquetas,
   });
 
   const {
@@ -150,6 +154,10 @@ export default function TicketsPage() {
             <Sparkles />
             La IA sugiere más urgencia
           </Button>
+        ) : null}
+
+        {esAgente ? (
+          <TagFilter seleccion={etiquetas} onChange={setEtiquetas} />
         ) : null}
 
         <Button className="ml-auto" onClick={() => setAbriendo(true)}>
@@ -246,6 +254,18 @@ function Fila({ ticket }: { ticket: TicketSummary }) {
       </span>
 
       <span className="flex shrink-0 items-center gap-3 max-sm:w-full max-sm:pl-7">
+        {ticket.tags !== undefined && ticket.tags.length > 0 ? (
+          <span className="flex max-w-56 flex-wrap justify-end gap-1">
+            {ticket.tags.slice(0, 3).map((tag) => (
+              <TagLozenge key={tag.id} tag={tag} />
+            ))}
+            {ticket.tags.length > 3 ? (
+              <span className="text-[11px] text-muted-foreground">
+                +{ticket.tags.length - 3}
+              </span>
+            ) : null}
+          </span>
+        ) : null}
         {ticket.aiTriage ? (
           <SugerenciaIa
             sugerencia={ticket.aiTriage}

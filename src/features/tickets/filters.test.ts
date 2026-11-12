@@ -87,4 +87,23 @@ describe('filtrosDeBandeja', () => {
       filtrosDeBandeja({ estado: '', soloMios: false, miId: MI_ID, esAgente: true, soloIaUrgentes: false }),
     ).toEqual({});
   });
+
+  describe('etiquetas (ADR-0031)', () => {
+    const base = { estado: '' as const, soloMios: false, miId: MI_ID, esAgente: true };
+
+    it('sin etiquetas elegidas la clave no cambia', () => {
+      expect(filtrosDeBandeja({ ...base, etiquetas: [] })).toEqual({});
+    });
+
+    it('las etiquetas van ordenadas: el mismo conjunto es la misma clave', () => {
+      expect(filtrosDeBandeja({ ...base, etiquetas: ['b', 'a'] })).toEqual({
+        tagIds: ['a', 'b'],
+      });
+    });
+
+    it('a un viewer no se le manda (el backend respondería 403)', () => {
+      expect(filtrosDeBandeja({ ...base, esAgente: false, etiquetas: ['a'] })).toEqual({});
+    });
+  });
 });
+
