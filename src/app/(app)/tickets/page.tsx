@@ -41,6 +41,7 @@ import {
 import {
   filtrosDeBandeja,
   hayFiltros,
+  mensajeBandejaVacia,
   type FiltrosDeBandeja,
 } from '@/features/tickets/filters';
 import { TagFilter } from '@/features/tags/components/tag-filter';
@@ -215,9 +216,13 @@ export default function TicketsPage() {
         <BandejaVacia
           filtros={filtros}
           onVerTodos={() => {
+            // "Ver todos" quita TODO lo que filtra: antes la búsqueda y las
+            // etiquetas quedaban puestas y el botón parecía no hacer nada.
             setEstado('');
             setSoloMios(false);
             setSoloIaUrgentes(false);
+            setEtiquetas([]);
+            setTexto('');
           }}
           onAbrir={() => setAbriendo(true)}
         />
@@ -427,24 +432,7 @@ function BandejaVacia({
   onAbrir: () => void;
 }) {
   const filtrada = hayFiltros(filtros);
-  const porAsignacion = filtros.assigneeId !== undefined;
-  const porAutoria = filtros.requesterId !== undefined;
-  const porEstado = filtros.status !== undefined;
-  const porIa = filtros.aiSuggestsHigher === true;
-
-  const mensaje = porIa
-    ? 'La IA no ve ningún ticket más urgente de lo que está marcado.'
-    : porAsignacion
-    ? porEstado
-      ? 'No tenés ningún ticket asignado con ese estado.'
-      : 'No tenés ningún ticket asignado.'
-    : porAutoria
-      ? porEstado
-        ? 'No abriste ningún ticket con ese estado.'
-        : 'Todavía no abriste ningún ticket.'
-      : porEstado
-        ? 'Ningún ticket con ese estado.'
-        : 'La bandeja está vacía. Los tickets aparecen acá en cuanto alguien abre uno.';
+  const mensaje = mensajeBandejaVacia(filtros);
 
   return (
     <Card className="flex flex-col items-center gap-3 px-6 py-12 text-center">

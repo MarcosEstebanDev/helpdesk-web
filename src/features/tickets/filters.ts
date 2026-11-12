@@ -86,3 +86,30 @@ export function filtrosDeBandeja({
 export function hayFiltros(filtros: FiltrosDeBandeja): boolean {
   return Object.keys(filtros).length > 0;
 }
+
+/**
+ * Qué decir cuando la bandeja vuelve vacía. La búsqueda gana a todo: si se
+ * buscó algo, decir "la bandeja está vacía" sería falso.
+ */
+export function mensajeBandejaVacia(filtros: FiltrosDeBandeja): string {
+  if (filtros.q !== undefined) return `Ningún ticket coincide con «${filtros.q}».`;
+  if (filtros.aiSuggestsHigher === true) {
+    return 'La IA no ve ningún ticket más urgente de lo que está marcado.';
+  }
+  if (filtros.tagIds !== undefined) return 'Ningún ticket con esas etiquetas.';
+  const porEstado = filtros.status !== undefined;
+  if (filtros.assigneeId !== undefined) {
+    return porEstado
+      ? 'No tenés ningún ticket asignado con ese estado.'
+      : 'No tenés ningún ticket asignado.';
+  }
+  if (filtros.requesterId !== undefined) {
+    return porEstado
+      ? 'No abriste ningún ticket con ese estado.'
+      : 'Todavía no abriste ningún ticket.';
+  }
+  return porEstado
+    ? 'Ningún ticket con ese estado.'
+    : 'La bandeja está vacía. Los tickets aparecen acá en cuanto alguien abre uno.';
+}
+
