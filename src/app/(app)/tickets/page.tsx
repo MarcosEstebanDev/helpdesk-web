@@ -50,6 +50,7 @@ import {
 const ESTADO_TEXTO: Record<TicketStatus, string> = {
   OPEN: 'Abiertos',
   IN_PROGRESS: 'En curso',
+  WAITING_ON_CUSTOMER: 'Esperando al cliente',
   RESOLVED: 'Resueltos',
   CLOSED: 'Cerrados',
 };

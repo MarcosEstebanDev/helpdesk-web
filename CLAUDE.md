@@ -63,7 +63,25 @@ usa el Dockerfile y Vercel lo ignora. Pasos en `helpdesk-api/docs/DEPLOY.md`.
 Nota vieja corregida: `feat/members-endpoint` del backend YA está en `dev` y en
 `main` (se mergeó el 2026-09-10); lo de "sin mergear" de más abajo es historia.
 
-## Estado actual (2026-09-09)
+## Esperando al cliente (2026-11-12, ADR-0029 del backend)
+
+Rama `feat/esperando-al-cliente` (sale de `dev`, sin mergear ni pushear).
+
+- **`WAITING_ON_CUSTOMER`** en `lib/api/types.ts` (estado y `ALLOWED_TRANSITIONS`,
+  copia a mano de la tabla del backend). Lozenge **ámbar** (`warning`), no el
+  azul de En curso: la bandeja separa "lo trabajo" de "espera al cliente".
+- **`features/tickets/status-actions.ts`** (`accionesDesde`): el nombre de una
+  acción depende del ORIGEN — ir a `IN_PROGRESS` desde la espera es "Retomar",
+  no "Empezar" —, así que dejó de ser una tabla por destino en la página.
+- **Panel de SLA**: estado `paused` con el margen CONGELADO tal como llega y
+  "en pausa desde"; no se enseña "vence", porque la fecha se correrá lo que dure
+  la espera.
+- **Historial**: la vuelta automática (actor sistema, `trigger: 'customer_reply'`)
+  dice "El cliente respondió y el ticket volvió a curso".
+- Verificado: 103 tests, typecheck y lint. **Pendiente**: `pnpm build` y prueba
+  a mano contra la API.
+
+## Estado anterior (2026-09-09)
 
 **Fases 1, 2, 4, 6 y 7 (cliente) — CERRADAS.** El frontend ya se usa de punta a
 punta: entrar, abrir un ticket, conversarlo, operarlo como agente y configurar el

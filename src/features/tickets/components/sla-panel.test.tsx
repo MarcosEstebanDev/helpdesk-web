@@ -8,12 +8,35 @@ const reloj = (parcial: Partial<TicketSla> = {}): TicketSla => ({
   dueAt: '2026-09-09T12:00:00.000Z',
   stoppedAt: null,
   breachedAt: null,
+  pausedAt: null,
   status: 'running',
   remainingMinutes: 30,
   ...parcial,
 });
 
 describe('SlaPanel', () => {
+  it('un reloj en pausa lo dice y enseña el margen congelado (ADR-0029)', () => {
+    // El backend mide el margen de un reloj pausado contra la hora de la pausa:
+    // se pinta tal cual, sin cuenta atrás contra Date.now().
+    render(
+      <SlaPanel
+        sla={[
+          reloj({
+            kind: 'RESOLUTION',
+            status: 'paused',
+            pausedAt: '2026-09-09T11:00:00.000Z',
+            remainingMinutes: 60,
+          }),
+        ]}
+      />,
+    );
+
+    expect(
+      screen.getByText('En pausa, esperando al cliente · quedan 1 h'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^vence/)).not.toBeInTheDocument();
+  });
+
   it('no inventa un "cumple" cuando el ticket no tiene relojes', () => {
     // Los tickets anteriores a la fase 6, y los que el worker todavía no
     // procesó, llegan con `sla: []`. Enseñar "cumplido" ahí sería mentir; no
