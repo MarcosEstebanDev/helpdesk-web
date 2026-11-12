@@ -60,6 +60,12 @@ export interface TicketTriagedMessage extends MensajeBase {
   currentPriority?: string;
 }
 
+/** Cambiaron las etiquetas de un ticket (ADR-0031). Solo llega al equipo. */
+export interface TicketTagsChangedMessage extends MensajeBase {
+  added: string[];
+  removed: string[];
+}
+
 /** Mapa de nombre de evento a su payload. */
 export interface RealtimeEvents {
   'ticket.created': TicketCreatedMessage;
@@ -69,6 +75,7 @@ export interface RealtimeEvents {
   'ticket.unassigned': TicketAssignmentMessage;
   'sla.breached': SlaBreachedMessage;
   'ticket.triaged': TicketTriagedMessage;
+  'ticket.tags_changed': TicketTagsChangedMessage;
 }
 
 export type RealtimeEventName = keyof RealtimeEvents;

@@ -205,3 +205,41 @@ describe('describirEntrada', () => {
     expect(mala.prioridad).toBeUndefined();
   });
 });
+
+describe('describirEntrada: etiquetas (ADR-0031)', () => {
+  const tags = (added: string[], removed: string[]) =>
+    entrada({
+      action: 'ticket.tags_changed',
+      metadata: {
+        added: added.map((name, i) => ({ id: `a${i}`, name })),
+        removed: removed.map((name, i) => ({ id: `r${i}`, name })),
+      },
+    });
+
+  it('una agregada', () => {
+    expect(describirEntrada(tags(['bug'], []), PARTICIPANTES).frase).toBe(
+      'Agregó la etiqueta bug',
+    );
+  });
+
+  it('varias quitadas', () => {
+    expect(describirEntrada(tags([], ['bug', 'vip']), PARTICIPANTES).frase).toBe(
+      'Quitó las etiquetas bug y vip',
+    );
+  });
+
+  it('agregadas y quitadas a la vez', () => {
+    expect(
+      describirEntrada(tags(['vip', 'pago', 'web'], ['bug']), PARTICIPANTES).frase,
+    ).toBe('Agregó las etiquetas vip, pago y web; quitó la etiqueta bug');
+  });
+
+  it('sin metadata legible no inventa nombres', () => {
+    expect(
+      describirEntrada(
+        entrada({ action: 'ticket.tags_changed', metadata: null }),
+        PARTICIPANTES,
+      ).frase,
+    ).toBe('Cambió las etiquetas');
+  });
+});

@@ -18,6 +18,7 @@ import type {
   CommentAddedMessage,
   DisconnectedMessage,
   SlaBreachedMessage,
+  TicketTagsChangedMessage,
   TicketTriagedMessage,
   TicketAssignmentMessage,
   TicketCreatedMessage,
@@ -182,6 +183,17 @@ export function WsProvider({ children }: { children: ReactNode }) {
 
     socket.on('sla.breached', (msg: SlaBreachedMessage) => {
       void queryClient.invalidateQueries({ queryKey: ticketKeys.all });
+      anotarCambio(msg.ticketId);
+    });
+
+    // Etiquetas (ADR-0031): cambian lo que se ve en el detalle y en cada fila
+    // de la bandeja (y el resultado de un filtro por etiqueta). Solo llega al
+    // equipo: el backend no lo manda a la sala general.
+    socket.on('ticket.tags_changed', (msg: TicketTagsChangedMessage) => {
+      void queryClient.invalidateQueries({
+        queryKey: ticketKeys.detail(msg.ticketId),
+      });
+      void queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
       anotarCambio(msg.ticketId);
     });
 
