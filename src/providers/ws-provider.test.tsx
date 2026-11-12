@@ -174,6 +174,20 @@ describe('lo que llega invalida caché', () => {
     });
   });
 
+  it('las etiquetas refrescan detalle, historial y listas, pero no la IA', () => {
+    // Invalidar el detalle por prefijo también volvía a pedir la sugerencia de
+    // la IA, que no cambia por etiquetar.
+    socketFalso.recibir('ticket.tags_changed', { ticketId: 't-4', added: [], removed: [] });
+
+    expect(invalidarSpy).toHaveBeenCalledWith({
+      queryKey: ticketKeys.detail('t-4'),
+      exact: true,
+    });
+    expect(invalidarSpy).toHaveBeenCalledWith({ queryKey: ticketKeys.history('t-4') });
+    expect(invalidarSpy).toHaveBeenCalledWith({ queryKey: ticketKeys.lists() });
+    expect(invalidarSpy).not.toHaveBeenCalledWith({ queryKey: ticketKeys.detail('t-4') });
+  });
+
   it('un cambio de estado refresca la lista y el detalle', () => {
     socketFalso.recibir('ticket.status_changed', { ticketId: 't-3' });
 

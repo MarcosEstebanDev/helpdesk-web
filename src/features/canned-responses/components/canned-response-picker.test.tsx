@@ -85,4 +85,21 @@ describe('CannedResponsePicker', () => {
 
     expect(screen.getByText(/Todavía no hay respuestas predefinidas/)).toBeInTheDocument();
   });
+
+  it('si la carga falla dice que falló, no que no hay respuestas', () => {
+    render(
+      <CannedResponsePicker
+        abierto
+        onAbiertoChange={() => {}}
+        respuestas={undefined}
+        cargando={false}
+        error
+        onElegir={() => {}}
+      />,
+    );
+
+    expect(screen.getByText(/No se pudieron cargar/)).toBeInTheDocument();
+    expect(screen.queryByText(/Todavía no hay respuestas/)).toBeNull();
+  });
 });
+

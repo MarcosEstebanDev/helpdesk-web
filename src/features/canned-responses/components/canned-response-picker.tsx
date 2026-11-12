@@ -33,12 +33,15 @@ export function CannedResponsePicker({
   onAbiertoChange,
   respuestas,
   cargando,
+  error = false,
   onElegir,
 }: {
   abierto: boolean;
   onAbiertoChange: (abierto: boolean) => void;
   respuestas: CannedResponse[] | undefined;
   cargando: boolean;
+  /** La carga falló: no es lo mismo que "no hay ninguna". */
+  error?: boolean;
   onElegir: (respuesta: CannedResponse) => void;
 }) {
   const [busqueda, setBusqueda] = useState('');
@@ -70,6 +73,10 @@ export function CannedResponsePicker({
         />
         {cargando ? (
           <Skeleton className="h-16" />
+        ) : error ? (
+          <p className="text-sm text-destructive">
+            No se pudieron cargar las respuestas. Probá de nuevo en un rato.
+          </p>
         ) : (respuestas ?? []).length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Todavía no hay respuestas predefinidas. Las crea un administrador en

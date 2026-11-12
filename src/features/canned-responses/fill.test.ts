@@ -48,7 +48,9 @@ describe('fillTemplate', () => {
 });
 
 describe('hasUnfilledPlaceholder', () => {
-  it.each(['Hola {{cliente.email}}', 'Hola {{', '{{x}}', 'fin }}'])(
+  // Los mismos casos que `canned-response.entity.spec.ts` del api: la regla
+  // vive dos veces (ADR-0001) y los dos lados tienen que coincidir.
+  it.each(['Hola {{cliente.email}}', 'Hola {{', '{{x}}', 'fin }}', '{{}}', '{{{ticket.numero}}}', '{{Ticket.Numero}}', 'Hola {{clinete.email}}'])(
     'detecta %p',
     (texto) => {
       expect(hasUnfilledPlaceholder(texto)).toBe(true);

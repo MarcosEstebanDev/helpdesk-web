@@ -21,7 +21,12 @@ export function TagFilter({
 }) {
   const catalogo = useTags(true);
   const tags = catalogo.data?.items ?? [];
-  const activas = seleccion.length;
+  // Una etiqueta elegida que después se borró ya no filtra nada: no se cuenta.
+  // Mientras el catálogo carga no se sabe, así que se cuenta lo elegido.
+  const activas =
+    catalogo.data === undefined
+      ? seleccion.length
+      : seleccion.filter((id) => tags.some((t) => t.id === id)).length;
 
   function alternar(id: string, marcada: boolean) {
     onChange(marcada ? [...seleccion, id] : seleccion.filter((s) => s !== id));

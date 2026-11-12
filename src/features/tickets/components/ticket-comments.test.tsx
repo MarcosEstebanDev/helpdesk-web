@@ -234,4 +234,28 @@ describe('TicketComments: respuestas predefinidas (ADR-0030)', () => {
       }),
     );
   });
+
+  it('"Enviar igual" no se puede pulsar dos veces mientras envía', async () => {
+    vi.mocked(addComment).mockReturnValue(new Promise(() => {}));
+    montar(ticket());
+    await userEvent.type(screen.getByLabelText('Respuesta'), 'Hola {{{{cliente.email}}');
+    await userEvent.click(screen.getByRole('button', { name: 'Responder' }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Enviar igual' }));
+
+    expect(addComment).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Enviar igual' })).toBeNull();
+  });
+
+  it('pasar a nota interna saca el aviso (una nota no le llega al cliente)', async () => {
+    montar(ticket());
+    await userEvent.type(screen.getByLabelText('Respuesta'), 'Hola {{{{cliente.email}}');
+    await userEvent.click(screen.getByRole('button', { name: 'Responder' }));
+    expect(screen.getByText(/Quedó una variable sin rellenar/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Nota interna' }));
+
+    expect(screen.queryByText(/Quedó una variable sin rellenar/)).toBeNull();
+  });
 });
+
