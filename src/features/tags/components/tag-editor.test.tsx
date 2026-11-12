@@ -124,5 +124,63 @@ describe('TagEditor (ADR-0031)', () => {
     await waitFor(() => expect(setTicketTags).toHaveBeenCalledWith('tk1', ['bug', 'fa']));
     expect(createTag).toHaveBeenCalledTimes(1);
   });
+
+  describe('teclado y accesibilidad', () => {
+    it('es un combobox: las flechas mueven la opción activa y Enter la elige', async () => {
+      montar([]);
+      const caja = screen.getByRole('combobox', { name: 'Agregar etiqueta' });
+
+      await userEvent.type(caja, 'a');
+      expect(caja).toHaveAttribute('aria-expanded', 'true');
+      await userEvent.keyboard('{ArrowDown}');
+      const activa = caja.getAttribute('aria-activedescendant');
+      expect(activa).not.toBeNull();
+      expect(document.getElementById(activa ?? '')).toHaveAttribute('aria-selected', 'true');
+
+      await userEvent.keyboard('{Enter}');
+
+      await waitFor(() => expect(setTicketTags).toHaveBeenCalledTimes(1));
+    });
+
+    it('Enter sin opción activa elige la primera', async () => {
+      montar([]);
+
+      await userEvent.type(screen.getByRole('combobox'), 'vip{Enter}');
+
+      await waitFor(() => expect(setTicketTags).toHaveBeenCalledWith('tk1', ['vip']));
+    });
+
+    it('Escape cierra la lista sin borrar lo escrito', async () => {
+      montar([]);
+      const caja = screen.getByRole('combobox');
+
+      await userEvent.type(caja, 'vi{Escape}');
+
+      expect(screen.queryByRole('listbox')).toBeNull();
+      expect(caja).toHaveValue('vi');
+      expect(caja).toHaveAttribute('aria-expanded', 'false');
+    });
+  });
+
+  it('mientras el catálogo carga no ofrece crear (podría ya existir)', async () => {
+    vi.mocked(listTags).mockReturnValue(new Promise(() => {}));
+    montar([]);
+
+    await userEvent.type(screen.getByRole('combobox'), 'vip');
+
+    expect(screen.queryByRole('option', { name: /Crear/ })).toBeNull();
+  });
+
+  it('con 10 etiquetas no deja agregar más (no crea una huérfana)', () => {
+    const diez = Array.from({ length: 10 }, (_, i) => ({
+      id: `t${i}`,
+      name: `t${i}`,
+      color: 'gray' as const,
+    }));
+    montar(diez);
+
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.getByText(/máximo de 10/)).toBeInTheDocument();
+  });
 });
 

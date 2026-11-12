@@ -190,8 +190,14 @@ export function WsProvider({ children }: { children: ReactNode }) {
     // de la bandeja (y el resultado de un filtro por etiqueta). Solo llega al
     // equipo: el backend no lo manda a la sala general.
     socket.on('ticket.tags_changed', (msg: TicketTagsChangedMessage) => {
+      // `exact`: por prefijo también volvería a pedir la sugerencia de la IA,
+      // que no cambia por etiquetar. El historial sí (tiene una entrada nueva).
       void queryClient.invalidateQueries({
         queryKey: ticketKeys.detail(msg.ticketId),
+        exact: true,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ticketKeys.history(msg.ticketId),
       });
       void queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
       anotarCambio(msg.ticketId);

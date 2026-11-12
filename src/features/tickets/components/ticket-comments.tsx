@@ -67,6 +67,13 @@ export function TicketComments({
   const [pidiendoConfirmacion, setPidiendoConfirmacion] = useState(false);
   const plantillas = useCannedResponses(esEquipo);
 
+  function cambiarVisibilidad(valor: CommentVisibility) {
+    setVisibilidad(valor);
+    // El aviso habla de lo que va a ver el cliente: en una nota interna ya no
+    // aplica, y dejarlo decía algo falso.
+    setPidiendoConfirmacion(false);
+  }
+
   function cambiarTexto(valor: string) {
     setTexto(valor);
     // Lo confirmado era OTRO texto: si cambia, se vuelve a preguntar.
@@ -154,7 +161,7 @@ export function TicketComments({
         <form onSubmit={onSubmit} className="space-y-2">
           {esEquipo ? (
             <div className="flex items-center justify-between gap-2">
-              <SelectorVisibilidad valor={visibilidad} onChange={setVisibilidad} />
+              <SelectorVisibilidad valor={visibilidad} onChange={cambiarVisibilidad} />
               <Button
                 type="button"
                 size="sm"
@@ -209,6 +216,7 @@ export function TicketComments({
               onAbiertoChange={setSelectorAbierto}
               respuestas={plantillas.data?.items}
               cargando={plantillas.isPending}
+              error={plantillas.isError}
               onElegir={insertarPlantilla}
             />
           ) : null}
