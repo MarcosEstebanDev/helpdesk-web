@@ -64,6 +64,30 @@ describe('describirEntrada', () => {
     expect(d.transicion).toEqual({ desde: 'OPEN', hasta: 'IN_PROGRESS' });
   });
 
+  it('la vuelta automática desde la espera dice por qué ocurrió (ADR-0029)', () => {
+    const d = describirEntrada(
+      entrada({
+        action: 'ticket.status_changed',
+        actorId: SYSTEM_ACTOR_ID,
+        metadata: {
+          from: 'WAITING_ON_CUSTOMER',
+          to: 'IN_PROGRESS',
+          automatic: true,
+          trigger: 'customer_reply',
+        },
+      }),
+      PARTICIPANTES,
+    );
+
+    expect(d.papel).toBe('sistema');
+    expect(d.frase).toBe('El cliente respondió y el ticket volvió a curso');
+    expect(d.automatico).toBe(true);
+    expect(d.transicion).toEqual({
+      desde: 'WAITING_ON_CUSTOMER',
+      hasta: 'IN_PROGRESS',
+    });
+  });
+
   // El caso que justifica todo el archivo: `metadata` es `unknown` y puede
   // llegar cualquier cosa. Antes que suponer una transición, no se dice.
   it('un cambio de estado con metadata ilegible no inventa la transición', () => {

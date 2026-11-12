@@ -122,6 +122,17 @@ export function describirEntrada(
       if (desde === null || hasta === null) {
         return { papel, frase: 'Cambió el estado' };
       }
+      // La vuelta sola desde la espera (ADR-0029): la hizo el sistema porque
+      // el cliente contestó. Sin decirlo, "El sistema cambió el estado" se lee
+      // como algo que pasó sin motivo.
+      if (meta?.automatic === true && meta?.trigger === 'customer_reply') {
+        return {
+          papel,
+          frase: 'El cliente respondió y el ticket volvió a curso',
+          automatico: true,
+          transicion: { desde, hasta },
+        };
+      }
       return { papel, frase: 'Cambió el estado', transicion: { desde, hasta } };
     }
 

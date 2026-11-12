@@ -30,17 +30,11 @@ import { ApiError } from '@/lib/api/client';
 import { useTicketWatch } from '@/lib/realtime/use-ticket-watch';
 import { cn } from '@/lib/utils';
 import {
-  ALLOWED_TRANSITIONS,
-  type TicketDetail,
-  type TicketStatus,
-} from '@/lib/api/types';
+  accionesDesde,
+  type AccionDeEstado,
+} from '@/features/tickets/status-actions';
+import type { TicketDetail } from '@/lib/api/types';
 
-const ESTADO_ACCION: Record<TicketStatus, string> = {
-  OPEN: 'Reabrir',
-  IN_PROGRESS: 'Empezar',
-  RESOLVED: 'Resolver',
-  CLOSED: 'Cerrar',
-};
 
 /**
  * Detalle de un ticket, con la anatomía de una vista de incidencia: a la
@@ -220,7 +214,7 @@ function Dato({
 function MenuDeEstado({ ticket }: { ticket: TicketDetail }) {
   const avisos = useAvisos();
   const cambiarEstado = useChangeStatus(ticket.id);
-  const siguientes = ALLOWED_TRANSITIONS[ticket.status];
+  const siguientes = accionesDesde(ticket.status);
 
   if (siguientes.length === 0) {
     return (
@@ -233,9 +227,11 @@ function MenuDeEstado({ ticket }: { ticket: TicketDetail }) {
     );
   }
 
-  function transicionar(estado: TicketStatus) {
-    cambiarEstado.mutate(estado, {
-      onSuccess: () => avisos.exito(`Ticket ${ESTADO_ACCION[estado].toLowerCase()}`),
+  function transicionar(accion: AccionDeEstado) {
+    cambiarEstado.mutate(accion.to, {
+      // El nombre de la acción depende del origen ("Retomar" no es "Empezar"),
+      // así que el aviso repite el que se eligió en el menú.
+      onSuccess: () => avisos.exito(`${accion.label}: hecho`),
       onError: (e) =>
         avisos.error(
           'No se pudo cambiar el estado',
@@ -265,14 +261,14 @@ function MenuDeEstado({ ticket }: { ticket: TicketDetail }) {
               'transition-opacity duration-100',
             )}
           >
-            {siguientes.map((estado) => (
+            {siguientes.map((accion) => (
               <Menu.Item
-                key={estado}
-                onClick={() => transicionar(estado)}
+                key={accion.to}
+                onClick={() => transicionar(accion)}
                 className="flex cursor-default items-center justify-between gap-3 rounded-md px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
               >
-                {ESTADO_ACCION[estado]}
-                <StatusBadge status={estado} />
+                {accion.label}
+                <StatusBadge status={accion.to} />
               </Menu.Item>
             ))}
           </Menu.Popup>

@@ -12,6 +12,7 @@
 export const TICKET_STATUSES = [
   'OPEN',
   'IN_PROGRESS',
+  'WAITING_ON_CUSTOMER',
   'RESOLVED',
   'CLOSED',
 ] as const;
@@ -25,12 +26,14 @@ export type Role = 'ADMIN' | 'AGENT' | 'VIEWER';
 /**
  * Transiciones legales (ADR-0015 del backend). Se replican para no ofrecer
  * botones que van a devolver 409, pero **el backend sigue siendo la autoridad**:
- * esto es UX, no validación.
+ * esto es UX, no validación. Es una copia a mano de la tabla del backend: al
+ * sumar un estado allí (WAITING_ON_CUSTOMER, ADR-0029) hay que sumarlo aquí.
  */
 export const ALLOWED_TRANSITIONS: Record<TicketStatus, readonly TicketStatus[]> =
   {
     OPEN: ['IN_PROGRESS', 'RESOLVED'],
-    IN_PROGRESS: ['RESOLVED', 'OPEN'],
+    IN_PROGRESS: ['RESOLVED', 'OPEN', 'WAITING_ON_CUSTOMER'],
+    WAITING_ON_CUSTOMER: ['IN_PROGRESS', 'RESOLVED'],
     RESOLVED: ['CLOSED', 'OPEN'],
     CLOSED: [],
   };
@@ -109,13 +112,15 @@ export interface TicketComment {
 }
 
 export type SlaKind = 'RESPONSE' | 'RESOLUTION';
-export type SlaStatus = 'running' | 'met' | 'breached';
+export type SlaStatus = 'running' | 'paused' | 'met' | 'breached';
 
 export interface TicketSla {
   kind: SlaKind;
   dueAt: string;
   stoppedAt: string | null;
   breachedAt: string | null;
+  /** Desde cuándo está en pausa (el ticket espera al cliente). */
+  pausedAt: string | null;
   status: SlaStatus;
   /** Negativo si se pasó del objetivo. */
   remainingMinutes: number;

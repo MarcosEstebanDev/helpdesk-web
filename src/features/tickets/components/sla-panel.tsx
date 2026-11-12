@@ -52,9 +52,18 @@ export function SlaPanel({ sla }: { sla: TicketSla[] }) {
             >
               <SlaEstado reloj={reloj} />
             </p>
-            <p className="text-xs text-muted-foreground" suppressHydrationWarning>
-              vence {fechaCorta(reloj.dueAt)}
-            </p>
+            {reloj.status === 'paused' && reloj.pausedAt !== null ? (
+              // En pausa no hay fecha de vencimiento que dar: se correrá lo que
+              // dure la espera, y enseñar la de ahora sería prometer una hora
+              // falsa. Se dice desde cuándo espera.
+              <p className="text-xs text-muted-foreground" suppressHydrationWarning>
+                en pausa desde {fechaCorta(reloj.pausedAt)}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground" suppressHydrationWarning>
+                vence {fechaCorta(reloj.dueAt)}
+              </p>
+            )}
           </div>
         </div>
       ))}
@@ -62,11 +71,12 @@ export function SlaPanel({ sla }: { sla: TicketSla[] }) {
   );
 }
 
-type Situacion = 'incumplido' | 'cumplido' | 'vencido' | 'en-marcha';
+type Situacion = 'incumplido' | 'cumplido' | 'en-pausa' | 'vencido' | 'en-marcha';
 
 const COLOR_FILO: Record<Situacion, string> = {
   incumplido: 'bg-destructive',
   cumplido: 'bg-success-foreground',
+  'en-pausa': 'bg-muted-foreground',
   vencido: 'bg-warning-foreground',
   'en-marcha': 'bg-primary',
 };
@@ -74,6 +84,7 @@ const COLOR_FILO: Record<Situacion, string> = {
 const COLOR_TEXTO: Record<Situacion, string> = {
   incumplido: 'text-destructive',
   cumplido: 'text-success-foreground',
+  'en-pausa': 'text-muted-foreground',
   vencido: 'text-warning-foreground',
   'en-marcha': 'text-foreground',
 };
@@ -81,6 +92,7 @@ const COLOR_TEXTO: Record<Situacion, string> = {
 function situacion(reloj: TicketSla): Situacion {
   if (reloj.status === 'breached') return 'incumplido';
   if (reloj.status === 'met') return 'cumplido';
+  if (reloj.status === 'paused') return 'en-pausa';
   // En marcha y ya pasado de hora: el barrido puede no haber pasado todavía.
   if (reloj.remainingMinutes < 0) return 'vencido';
   return 'en-marcha';
@@ -92,6 +104,15 @@ function SlaEstado({ reloj }: { reloj: TicketSla }) {
   }
   if (reloj.status === 'met') {
     return <>Cumplido, {margen(reloj.remainingMinutes)} antes</>;
+  }
+  if (reloj.status === 'paused') {
+    // El margen llega CONGELADO en la hora de la pausa (ADR-0029): se pinta
+    // tal cual, sin cuenta atrás.
+    return reloj.remainingMinutes < 0 ? (
+      <>En pausa, esperando al cliente · vencido por {margen(-reloj.remainingMinutes)}</>
+    ) : (
+      <>En pausa, esperando al cliente · quedan {margen(reloj.remainingMinutes)}</>
+    );
   }
   // No se dice que va bien, pero tampoco se marca como incumplido antes de que
   // el backend lo registre.
