@@ -1,6 +1,14 @@
 'use client';
 
-import { ArrowDown, ArrowUp, Inbox, Plus, Sparkles, UserCheck } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  Inbox,
+  Plus,
+  Search,
+  Sparkles,
+  UserCheck,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
@@ -33,12 +41,14 @@ import {
 import {
   filtrosDeBandeja,
   hayFiltros,
+  mensajeBandejaVacia,
   type FiltrosDeBandeja,
 } from '@/features/tickets/filters';
 import { TagFilter } from '@/features/tags/components/tag-filter';
 import { TagLozenge } from '@/features/tags/components/tag-lozenge';
 import { useCreateTicket, useTickets } from '@/features/tickets/queries';
 import { ApiError } from '@/lib/api/client';
+import { useDebounced } from '@/lib/use-debounced';
 import { useWs } from '@/providers/ws-provider';
 import { cn } from '@/lib/utils';
 import {
@@ -77,6 +87,9 @@ export default function TicketsPage() {
   const [soloMios, setSoloMios] = useState(false);
   const [soloIaUrgentes, setSoloIaUrgentes] = useState(false);
   const [etiquetas, setEtiquetas] = useState<string[]>([]);
+  const [texto, setTexto] = useState('');
+  // La búsqueda viaja recién cuando se deja de escribir (ADR-0032).
+  const busqueda = useDebounced(texto, 300);
   const [abriendo, setAbriendo] = useState(false);
 
   // El filtro existe para los tres roles, pero NO significa lo mismo: un agente
@@ -93,6 +106,7 @@ export default function TicketsPage() {
     esAgente,
     soloIaUrgentes,
     etiquetas,
+    busqueda,
   });
 
   const {
@@ -111,6 +125,19 @@ export default function TicketsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold tracking-tight">Tickets</h1>
+
+        <div className="relative w-full sm:w-64">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            placeholder="Buscar… (o #123)"
+            aria-label="Buscar tickets"
+            maxLength={200}
+            className="pl-8"
+          />
+        </div>
 
         <Select
           aria-label="Filtrar por estado"
@@ -189,9 +216,13 @@ export default function TicketsPage() {
         <BandejaVacia
           filtros={filtros}
           onVerTodos={() => {
+            // "Ver todos" quita TODO lo que filtra: antes la búsqueda y las
+            // etiquetas quedaban puestas y el botón parecía no hacer nada.
             setEstado('');
             setSoloMios(false);
             setSoloIaUrgentes(false);
+            setEtiquetas([]);
+            setTexto('');
           }}
           onAbrir={() => setAbriendo(true)}
         />
@@ -401,24 +432,7 @@ function BandejaVacia({
   onAbrir: () => void;
 }) {
   const filtrada = hayFiltros(filtros);
-  const porAsignacion = filtros.assigneeId !== undefined;
-  const porAutoria = filtros.requesterId !== undefined;
-  const porEstado = filtros.status !== undefined;
-  const porIa = filtros.aiSuggestsHigher === true;
-
-  const mensaje = porIa
-    ? 'La IA no ve ningún ticket más urgente de lo que está marcado.'
-    : porAsignacion
-    ? porEstado
-      ? 'No tenés ningún ticket asignado con ese estado.'
-      : 'No tenés ningún ticket asignado.'
-    : porAutoria
-      ? porEstado
-        ? 'No abriste ningún ticket con ese estado.'
-        : 'Todavía no abriste ningún ticket.'
-      : porEstado
-        ? 'Ningún ticket con ese estado.'
-        : 'La bandeja está vacía. Los tickets aparecen acá en cuanto alguien abre uno.';
+  const mensaje = mensajeBandejaVacia(filtros);
 
   return (
     <Card className="flex flex-col items-center gap-3 px-6 py-12 text-center">

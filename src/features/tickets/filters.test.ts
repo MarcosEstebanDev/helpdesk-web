@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filtrosDeBandeja } from './filters';
+import { filtrosDeBandeja, mensajeBandejaVacia } from './filters';
 
 const MI_ID = '11111111-1111-1111-1111-111111111111';
 
@@ -104,6 +104,45 @@ describe('filtrosDeBandeja', () => {
     it('a un viewer no se le manda (el backend respondería 403)', () => {
       expect(filtrosDeBandeja({ ...base, esAgente: false, etiquetas: ['a'] })).toEqual({});
     });
+  });
+
+  describe('búsqueda (ADR-0032)', () => {
+    const base = { estado: '' as const, soloMios: false, miId: MI_ID, esAgente: false };
+
+    it('el texto va recortado en la clave', () => {
+      expect(filtrosDeBandeja({ ...base, busqueda: '  pdf blanco ' })).toEqual({
+        q: 'pdf blanco',
+      });
+    });
+
+    it('vacío o solo espacios se omite (misma clave que "sin filtros")', () => {
+      expect(filtrosDeBandeja({ ...base, busqueda: '   ' })).toEqual({});
+    });
+
+    it('vale para cualquier rol: el backend decide qué comentarios cuentan', () => {
+      expect(filtrosDeBandeja({ ...base, esAgente: false, busqueda: 'x' }).q).toBe('x');
+    });
+  });
+});
+
+describe('mensajeBandejaVacia', () => {
+  it('sin filtros, la bandeja está vacía de verdad', () => {
+    expect(mensajeBandejaVacia({})).toMatch(/La bandeja está vacía/);
+  });
+
+  it('una búsqueda sin resultados lo dice con el texto buscado (gana a todo)', () => {
+    expect(mensajeBandejaVacia({ q: 'pdf', status: 'OPEN' })).toBe(
+      'Ningún ticket coincide con «pdf».',
+    );
+  });
+
+  it('con etiquetas y sin resultados no dice que la bandeja está vacía', () => {
+    expect(mensajeBandejaVacia({ tagIds: ['a'] })).toBe('Ningún ticket con esas etiquetas.');
+  });
+
+  it('conserva los mensajes de antes', () => {
+    expect(mensajeBandejaVacia({ status: 'OPEN' })).toBe('Ningún ticket con ese estado.');
+    expect(mensajeBandejaVacia({ aiSuggestsHigher: true })).toMatch(/La IA no ve/);
   });
 });
 

@@ -18,6 +18,8 @@ export interface ListTicketsParams {
   aiSuggestsHigher?: true;
   /** Solo AGENT o superior: tickets con al menos una (ADR-0031). */
   tagIds?: string[];
+  /** Texto libre (ADR-0032). */
+  q?: string;
   limit?: number;
   /** Id del último ticket recibido (paginación por cursor, no por offset). */
   cursor?: string;
@@ -33,6 +35,7 @@ export function listTickets(params: ListTicketsParams): Promise<TicketPage> {
   if (params.aiSuggestsHigher) query.set('aiSuggestsHigher', 'true');
   // `append` y no `set`: el backend espera `?tagId=a&tagId=b`.
   for (const tagId of params.tagIds ?? []) query.append('tagId', tagId);
+  if (params.q) query.set('q', params.q);
   if (params.limit !== undefined) query.set('limit', String(params.limit));
   if (params.cursor) query.set('cursor', params.cursor);
 
