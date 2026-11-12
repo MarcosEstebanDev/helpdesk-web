@@ -102,6 +102,32 @@ export interface TagList {
   items: Tag[];
 }
 
+// ---------------------------------------------------------- vistas guardadas
+
+/** Filtros de una vista, versión 1 (ADR-0033 del backend). Lo vacío se omite. */
+export interface ViewFilters {
+  version: 1;
+  status?: TicketStatus;
+  /** "Asignados a mí": cada uno ve lo suyo. */
+  assignee?: 'me';
+  tagIds?: string[];
+  q?: string;
+  aiSuggestsHigher?: true;
+}
+
+/** Vista guardada. `shared` = la ve todo el equipo (solo un ADMIN la cambia). */
+export interface SavedView {
+  id: string;
+  name: string;
+  shared: boolean;
+  filters: ViewFilters;
+  updatedAt: string;
+}
+
+export interface SavedViewList {
+  items: SavedView[];
+}
+
 // ------------------------------------------------- respuestas predefinidas
 
 /**

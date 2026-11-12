@@ -45,6 +45,11 @@ export const cannedResponseKeys = {
   all: ['canned-responses'] as const,
 };
 
+/** Vistas guardadas (`GET /views`, AGENT o superior). Las invalida quien las guarda. */
+export const viewKeys = {
+  all: ['views'] as const,
+};
+
 /** Configuración de SLA de la organización (`GET /sla-policy`, solo ADMIN). */
 export const slaKeys = {
   policy: ['sla', 'policy'] as const,

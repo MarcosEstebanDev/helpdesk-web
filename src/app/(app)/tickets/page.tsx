@@ -10,7 +10,8 @@ import {
   UserCheck,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useState, type FormEvent } from 'react';
+import { Suspense, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import {
@@ -45,6 +46,12 @@ import {
   type FiltrosDeBandeja,
 } from '@/features/tickets/filters';
 import { TagFilter } from '@/features/tags/components/tag-filter';
+import { ControlesDeVista } from '@/features/views/components/view-controls';
+import {
+  type EstadoDeBandeja,
+  filtrosDeVistaAEstado,
+} from '@/features/views/mapping';
+import { useViews } from '@/features/views/queries';
 import { TagLozenge } from '@/features/tags/components/tag-lozenge';
 import { useCreateTicket, useTickets } from '@/features/tickets/queries';
 import { ApiError } from '@/lib/api/client';
@@ -56,6 +63,7 @@ import {
   TICKET_STATUSES,
   type TicketPriority,
   type TicketStatus,
+  type SavedView,
   type TicketSummary,
 } from '@/lib/api/types';
 
@@ -82,12 +90,60 @@ const PRIORIDAD_TEXTO: Record<TicketPriority, string> = {
  * hay ningún `setInterval` sondeando el servidor.
  */
 export default function TicketsPage() {
+  // `useSearchParams` exige un `Suspense` por encima para que Next pueda
+  // prerenderizar el resto de la página.
+  return (
+    <Suspense fallback={<Skeleton className="h-64 w-full rounded-lg" />}>
+      <BandejaConVista />
+    </Suspense>
+  );
+}
+
+/**
+ * Lee `?vista=` y monta la bandeja con esos filtros (ADR-0033 del backend).
+ * La `key` por vista vuelve a montar la bandeja al cambiar de vista: así sus
+ * filtros arrancan de la vista sin sincronizar estado con un efecto.
+ */
+function BandejaConVista() {
   const { user } = useSession();
-  const [estado, setEstado] = useState<TicketStatus | ''>('');
-  const [soloMios, setSoloMios] = useState(false);
-  const [soloIaUrgentes, setSoloIaUrgentes] = useState(false);
-  const [etiquetas, setEtiquetas] = useState<string[]>([]);
-  const [texto, setTexto] = useState('');
+  const esEquipo = user?.role === 'AGENT' || user?.role === 'ADMIN';
+  const vistaId = useSearchParams().get('vista');
+  const vistas = useViews(esEquipo && vistaId !== null);
+
+  if (vistaId !== null && esEquipo && vistas.isPending) {
+    return <Skeleton className="h-64 w-full rounded-lg" />;
+  }
+  const vista =
+    vistaId === null
+      ? null
+      : (vistas.data?.items.find((v) => v.id === vistaId) ?? null);
+
+  return (
+    <Bandeja
+      key={vistaId ?? 'todas'}
+      vista={vista}
+      vistaPerdida={vistaId !== null && vista === null}
+    />
+  );
+}
+
+function Bandeja({
+  vista,
+  vistaPerdida,
+}: {
+  vista: SavedView | null;
+  /** Se abrió `?vista=` de una que ya no existe (o no es visible): se muestra todo. */
+  vistaPerdida: boolean;
+}) {
+  const { user } = useSession();
+  const inicial = vista === null ? null : filtrosDeVistaAEstado(vista.filters);
+  const [estado, setEstado] = useState<TicketStatus | ''>(inicial?.estado ?? '');
+  const [soloMios, setSoloMios] = useState(inicial?.soloMios ?? false);
+  const [soloIaUrgentes, setSoloIaUrgentes] = useState(
+    inicial?.soloIaUrgentes ?? false,
+  );
+  const [etiquetas, setEtiquetas] = useState<string[]>(inicial?.etiquetas ?? []);
+  const [texto, setTexto] = useState(inicial?.texto ?? '');
   // La búsqueda viaja recién cuando se deja de escribir (ADR-0032).
   const busqueda = useDebounced(texto, 300);
   const [abriendo, setAbriendo] = useState(false);
@@ -108,6 +164,13 @@ export default function TicketsPage() {
     etiquetas,
     busqueda,
   });
+  const estadoActual: EstadoDeBandeja = {
+    estado,
+    soloMios,
+    soloIaUrgentes,
+    etiquetas,
+    texto,
+  };
 
   const {
     data,
@@ -124,7 +187,9 @@ export default function TicketsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold tracking-tight">Tickets</h1>
+        <h1 className="text-xl font-semibold tracking-tight">
+          {vista?.name ?? 'Tickets'}
+        </h1>
 
         <div className="relative w-full sm:w-64">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -187,11 +252,25 @@ export default function TicketsPage() {
           <TagFilter seleccion={etiquetas} onChange={setEtiquetas} />
         ) : null}
 
+        {esAgente ? (
+          <ControlesDeVista
+            vista={vista}
+            estado={estadoActual}
+            esAdmin={user?.role === 'ADMIN'}
+          />
+        ) : null}
+
         <Button className="ml-auto" onClick={() => setAbriendo(true)}>
           <Plus />
           Abrir ticket
         </Button>
       </div>
+
+      {vistaPerdida ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Esa vista ya no existe. Se muestran todos los tickets.
+        </p>
+      ) : null}
 
       <Dialog
         abierto={abriendo}

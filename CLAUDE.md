@@ -63,6 +63,20 @@ usa el Dockerfile y Vercel lo ignora. Pasos en `helpdesk-api/docs/DEPLOY.md`.
 Nota vieja corregida: `feat/members-endpoint` del backend YA está en `dev` y en
 `main` (se mergeó el 2026-09-10); lo de "sin mergear" de más abajo es historia.
 
+## Vistas guardadas (2026-11-13, ADR-0033 del backend)
+
+Rama `feat/vistas-guardadas` (entrega 3 de 3). Solo el equipo.
+
+- `features/views/`: `api.ts`, `queries.ts` (`useViews(habilitado)`),
+  `mapping.ts` (vista ↔ `EstadoDeBandeja`; `assignee: 'me'` = "Mis tickets",
+  lo vacío no se guarda, `mismoEstado` para saber si cambió algo),
+  `views-nav` (barra lateral, debajo de "Tickets") y `view-controls`
+  (Guardar / Actualizar / Borrar vista; "Compartir" solo ADMIN).
+- La bandeja lee `?vista=<id>` dentro de un `Suspense` y monta `Bandeja` con
+  `key` por vista: los filtros arrancan de la vista sin un efecto que
+  sincronice estado (la regla `react-hooks/set-state-in-effect` es error acá).
+  Vista inexistente → todos los tickets y un aviso.
+
 ## Búsqueda (2026-11-13, ADR-0032 del backend)
 
 Rama `feat/busqueda` (entrega 2 de 3). Caja "Buscar… (o #123)" en la bandeja;
