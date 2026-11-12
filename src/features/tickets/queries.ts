@@ -10,7 +10,11 @@ import * as api from '@/features/tickets/api';
 import type { FiltrosDeBandeja } from '@/features/tickets/filters';
 import { ApiError } from '@/lib/api/client';
 import { ticketKeys } from '@/lib/query/keys';
-import type { TicketPriority, TicketStatus } from '@/lib/api/types';
+import type {
+  CommentVisibility,
+  TicketPriority,
+  TicketStatus,
+} from '@/lib/api/types';
 
 const PAGE_SIZE = 20;
 
@@ -101,7 +105,8 @@ export function useAddComment(ticketId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (body: string) => api.addComment(ticketId, body),
+    mutationFn: (input: { body: string; visibility: CommentVisibility }) =>
+      api.addComment(ticketId, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ticketKeys.detail(ticketId),

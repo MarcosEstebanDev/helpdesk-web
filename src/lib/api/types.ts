@@ -94,10 +94,17 @@ export interface TicketSummary {
   aiTriage?: { category: string; suggestedPriority: TicketPriority } | null;
 }
 
+/**
+ * `INTERNAL` es una nota del equipo (ADR-0028 del backend): el cliente no la
+ * ve —el backend ni siquiera se la manda— y no cuenta como respuesta del SLA.
+ */
+export type CommentVisibility = 'PUBLIC' | 'INTERNAL';
+
 export interface TicketComment {
   id: string;
   authorId: string;
   body: string;
+  visibility: CommentVisibility;
   createdAt: string;
 }
 
