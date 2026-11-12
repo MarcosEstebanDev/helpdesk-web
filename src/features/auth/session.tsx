@@ -51,9 +51,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           if (!vivo) return;
           setUser({
             id: perfil.userId,
-            // El backend no expone el email en `/auth/me`; se rellena al hacer
-            // login y queda vacío tras recuperar la sesión con el refresh.
-            email: '',
+            // `/auth/me` lo lee de la base (ADR-0025 del backend). Antes quedaba
+            // vacío tras recargar, y `{{agente.email}}` de una respuesta
+            // predefinida no se podía rellenar (ADR-0030).
+            email: perfil.email,
             tenantId: perfil.tenantId,
             role: perfil.role,
           });
