@@ -14,7 +14,15 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { VistasEnNav } from '@/features/views/components/views-nav';
+import {
+  Fragment,
+  Suspense,
+  useEffect,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from 'react';
 import { Button } from '@/components/ui/button';
 import { Lozenge, Skeleton } from '@/components/ui/primitives';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -248,6 +256,7 @@ function NavLateral({
 }) {
   const pathname = usePathname();
   const destinos = DESTINOS.filter((d) => !d.soloAdmin || rol === 'ADMIN');
+  const esEquipo = rol === 'AGENT' || rol === 'ADMIN';
 
   const enlaces = destinos.map((destino) => {
     // Se compara contra el primer segmento para que el detalle de un ticket
@@ -256,9 +265,8 @@ function NavLateral({
     const activo = pathname.startsWith(seccion);
     const Icono = destino.icono;
 
-    return (
+    const enlace = (
       <Link
-        key={destino.href}
         href={destino.href}
         aria-current={activo ? 'page' : undefined}
         onClick={onCerrar}
@@ -272,6 +280,20 @@ function NavLateral({
         <Icono className="size-4" />
         {destino.etiqueta}
       </Link>
+    );
+
+    // Las vistas guardadas cuelgan de "Tickets" (ADR-0033). Solo el equipo: a
+    // un VIEWER el backend le respondería 403. `Suspense` porque leen la URL.
+    const conVistas = destino.href === '/tickets' && esEquipo;
+    return (
+      <Fragment key={destino.href}>
+        {enlace}
+        {conVistas ? (
+          <Suspense fallback={null}>
+            <VistasEnNav onNavegar={onCerrar} />
+          </Suspense>
+        ) : null}
+      </Fragment>
     );
   });
 
