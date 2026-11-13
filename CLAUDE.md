@@ -63,6 +63,33 @@ usa el Dockerfile y Vercel lo ignora. Pasos en `helpdesk-api/docs/DEPLOY.md`.
 Nota vieja corregida: `feat/members-endpoint` del backend YA está en `dev` y en
 `main` (se mergeó el 2026-09-10); lo de "sin mergear" de más abajo es historia.
 
+## UX de bandeja y detalle (2026-11-13, rama `feat/ux-bandeja-detalle`)
+
+Spec y plan en `helpdesk-api/docs/superpowers/`. Principio: **color solo para
+lo que pide atención** (prioridad alta/urgente, SLA por vencer/vencido,
+esperando al cliente); nada en MAYÚSCULAS.
+
+- **Bandeja** (`features/tickets/inbox/`): pestañas con número
+  (`GET /tickets/counts`, `ticketKeys.counts` cuelga de `lists()` así que toda
+  invalidación existente la alcanza; "Todos" suma los cinco estados; "Cerrados"
+  solo aparece si una vista filtra por él). Tabla = lista de enlaces con grilla
+  (un `<a>` no puede envolver un `<tr>`); VIEWER con 4 columnas. `j`/`k` mueven
+  el FOCO (Enter lo abre el navegador); se ignoran en campos, con modificadores
+  y dentro de diálogos. En móvil cada fila es una tarjeta.
+- **Detalle**: acciones de estado a la vista en la cabecera
+  (`status-actions-bar`), el panel empieza por el SLA (sin barra de progreso,
+  misma razón de siempre). Chat: cliente a la izquierda, equipo a la derecha,
+  nota interna al centro con candado; los cambios de estado se intercalan
+  (`features/tickets/detail/linea-de-tiempo.ts`, solo `ticket.status_changed`).
+- **Cambió una regla vieja:** el historial ya NO se pide solo al abrir su
+  pestaña — el chat del equipo lo necesita. Comparten clave: una sola petición.
+- **"Responder y esperar al cliente"**: comentario y DESPUÉS cambio de estado,
+  encadenados. Si el comentario falla, el estado no se toca; si falla el estado,
+  se avisa que la respuesta SÍ salió (reintentar la duplicaría). Solo staff, en
+  público, y si `ALLOWED_TRANSITIONS` permite la espera (desde OPEN no).
+- Gotcha de test: el `QueryClient` de los tests tiene `staleTime` 0 y el de la
+  app 60 s; para probar "una sola petición" usar `makeQueryClient()`.
+
 ## Vistas guardadas (2026-11-13, ADR-0033 del backend)
 
 Rama `feat/vistas-guardadas` (entrega 3 de 3). Solo el equipo.

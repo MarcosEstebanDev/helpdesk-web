@@ -11,7 +11,11 @@ import type { TicketComment, TicketDetail } from '@/lib/api/types';
 
 // Se dobla el módulo de la API: lo que se prueba es qué se manda y cómo se
 // pinta lo que vuelve, no cómo viaja.
-vi.mock('@/features/tickets/api', () => ({ addComment: vi.fn() }));
+vi.mock('@/features/tickets/api', () => ({
+  addComment: vi.fn(),
+  changeStatus: vi.fn(),
+  getHistory: vi.fn().mockResolvedValue([]),
+}));
 vi.mock('@/features/canned-responses/api', () => ({ listCannedResponses: vi.fn() }));
 
 const rolActual = { valor: 'AGENT' as Role };
@@ -23,7 +27,7 @@ vi.mock('@/features/auth/session', () => ({
   }),
 }));
 
-import { addComment } from '@/features/tickets/api';
+import { addComment, changeStatus, getHistory } from '@/features/tickets/api';
 import { listCannedResponses } from '@/features/canned-responses/api';
 
 const comentario = (parcial: Partial<TicketComment>): TicketComment => ({
@@ -129,6 +133,109 @@ describe('TicketComments: notas internas', () => {
         visibility: 'INTERNAL',
       }),
     );
+  });
+});
+
+describe('TicketComments: chat y "Responder y esperar al cliente" (UX 2026-11-13)', () => {
+  const enCurso = (comments: TicketComment[] = []): TicketDetail => ({
+    ...ticket(comments),
+    status: 'IN_PROGRESS',
+  });
+
+  beforeEach(() => {
+    rolActual.valor = 'AGENT';
+    vi.mocked(addComment).mockReset();
+    vi.mocked(addComment).mockResolvedValue({ id: 'nuevo' });
+    vi.mocked(changeStatus).mockReset();
+    vi.mocked(changeStatus).mockResolvedValue({} as never);
+    vi.mocked(getHistory).mockReset();
+    vi.mocked(getHistory).mockResolvedValue([]);
+  });
+
+  it('manda la respuesta y DESPUÉS pasa el ticket a esperar al cliente', async () => {
+    montar(enCurso());
+
+    await userEvent.type(screen.getByLabelText('Respuesta'), '¿Me pasás una captura?');
+    await userEvent.click(screen.getByRole('button', { name: 'Responder y esperar al cliente' }));
+
+    await waitFor(() => expect(changeStatus).toHaveBeenCalledWith('tk1', 'WAITING_ON_CUSTOMER'));
+    expect(addComment).toHaveBeenCalledWith('tk1', {
+      body: '¿Me pasás una captura?',
+      visibility: 'PUBLIC',
+    });
+    expect(vi.mocked(addComment).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(changeStatus).mock.invocationCallOrder[0],
+    );
+  });
+
+  it('si la respuesta no sale, el estado no cambia', async () => {
+    vi.mocked(addComment).mockRejectedValueOnce(new Error('caído'));
+    montar(enCurso());
+
+    await userEvent.type(screen.getByLabelText('Respuesta'), 'Hola');
+    await userEvent.click(screen.getByRole('button', { name: 'Responder y esperar al cliente' }));
+
+    expect(await screen.findAllByText('No se pudo enviar la respuesta')).not.toHaveLength(0);
+    expect(changeStatus).not.toHaveBeenCalled();
+    // El borrador sigue ahí para reintentar.
+    expect(screen.getByLabelText('Respuesta')).toHaveValue('Hola');
+  });
+
+  it('si la respuesta sale pero el cambio de estado no, lo dice sin ocultar que se envió', async () => {
+    vi.mocked(changeStatus).mockRejectedValueOnce(new Error('409'));
+    montar(enCurso());
+
+    await userEvent.type(screen.getByLabelText('Respuesta'), 'Hola');
+    await userEvent.click(screen.getByRole('button', { name: 'Responder y esperar al cliente' }));
+
+    expect(
+      await screen.findAllByText('La respuesta se envió, pero el ticket no pasó a esperar al cliente'),
+    ).not.toHaveLength(0);
+  });
+
+  it('no se ofrece en una nota, a un VIEWER, ni desde un estado que no puede esperar', async () => {
+    const { unmount } = montar(ticket()); // OPEN no puede pasar a la espera (ADR-0029)
+    expect(screen.queryByRole('button', { name: 'Responder y esperar al cliente' })).toBeNull();
+    unmount();
+
+    montar(enCurso());
+    await userEvent.click(screen.getByRole('button', { name: 'Nota interna' }));
+    expect(screen.queryByRole('button', { name: 'Responder y esperar al cliente' })).toBeNull();
+  });
+
+  it('a un VIEWER no se le ofrece ni se le pide el historial', () => {
+    rolActual.valor = 'VIEWER';
+    montar(enCurso());
+
+    expect(screen.queryByRole('button', { name: 'Responder y esperar al cliente' })).toBeNull();
+    expect(getHistory).not.toHaveBeenCalled();
+  });
+
+  it('al equipo le intercala los cambios de estado en la conversación', async () => {
+    vi.mocked(getHistory).mockResolvedValue([
+      {
+        id: 'e1',
+        actorId: 'yo',
+        action: 'ticket.status_changed',
+        metadata: { from: 'OPEN', to: 'IN_PROGRESS' },
+        occurredAt: '2026-09-10T11:00:00.000Z',
+      },
+    ]);
+    montar(enCurso([comentario({ authorId: 'quien-lo-abrio' })]));
+
+    expect(await screen.findByText('Pasó a En curso')).toBeInTheDocument();
+  });
+
+  it('el cliente va a un lado y el equipo al otro', () => {
+    montar(
+      enCurso([
+        comentario({ id: 'c1', authorId: 'quien-lo-abrio', body: 'Del cliente' }),
+        comentario({ id: 'c2', authorId: 'yo', body: 'Del equipo' }),
+      ]),
+    );
+
+    expect(screen.getByText('Del cliente').closest('li')).toHaveAttribute('data-lado', 'cliente');
+    expect(screen.getByText('Del equipo').closest('li')).toHaveAttribute('data-lado', 'equipo');
   });
 });
 
