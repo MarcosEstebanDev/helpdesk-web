@@ -8,21 +8,21 @@ describe('PestanasDeEstado', () => {
   it('cada pestaña dice cuántos tickets tiene y marca la elegida', () => {
     render(<PestanasDeEstado actual="IN_PROGRESS" counts={COUNTS} onChange={() => {}} />);
 
-    expect(screen.getByRole('tab', { name: /En curso\s*2/ })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: /Todos\s*20/ })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('button', { name: /En curso\s*2/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Todos\s*20/ })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('sin conteos muestra las pestañas sin número', () => {
     render(<PestanasDeEstado actual="" counts={undefined} onChange={() => {}} />);
 
-    expect(screen.getByRole('tab', { name: 'Abiertos' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abiertos' })).toBeInTheDocument();
   });
 
   it('elegir una pestaña avisa el estado', () => {
     const onChange = vi.fn();
     render(<PestanasDeEstado actual="" counts={COUNTS} onChange={onChange} />);
 
-    fireEvent.click(screen.getByRole('tab', { name: /Esperando al cliente/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Esperando al cliente/ }));
 
     expect(onChange).toHaveBeenCalledWith('WAITING_ON_CUSTOMER');
   });

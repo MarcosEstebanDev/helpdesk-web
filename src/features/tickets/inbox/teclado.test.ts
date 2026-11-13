@@ -32,6 +32,21 @@ describe('debeIgnorarTecla', () => {
     expect(debeIgnorarTecla(evento(boton))).toBe(true);
   });
 
+  it('ignora lo que pasa dentro de un menú o lista desplegable', () => {
+    // El filtro de etiquetas es un menú: "j" ahí es su búsqueda por tecleo.
+    for (const rol of ['menu', 'listbox']) {
+      const menu = document.createElement('div');
+      menu.setAttribute('role', rol);
+      const item = document.createElement('div');
+      menu.append(item);
+      expect(debeIgnorarTecla(evento(item))).toBe(true);
+    }
+  });
+
+  it('ignora una tecla que otro componente ya atendió', () => {
+    expect(debeIgnorarTecla(evento(document.body, { defaultPrevented: true }))).toBe(true);
+  });
+
   it('atiende la tecla sobre la página o sobre una fila', () => {
     expect(debeIgnorarTecla(evento(document.body))).toBe(false);
     expect(debeIgnorarTecla(evento(document.createElement('a')))).toBe(false);

@@ -29,10 +29,10 @@ const RELOJ_TEXTO = {
 /**
  * Rastro de auditoría del ticket.
  *
- * Se pide **solo cuando la pestaña está abierta** (`habilitado`): es un registro
- * secundario, y traerlo al montar el detalle sería una petición extra en cada
- * apertura de ticket para algo que casi nadie mira. Una vez cargado queda en
- * caché, así que alternar entre pestañas no vuelve a pedir nada.
+ * Para el equipo ya llega pedido: desde UX 2026-11-13 la conversación lo usa
+ * para intercalar los cambios de estado, y esta pestaña comparte la misma
+ * clave, así que abrirla no vuelve a pedir nada. `habilitado` queda para quien
+ * monte este componente suelto.
  *
  * Tampoco hace falta invalidarlo a mano desde el WebSocket: `ticketKeys.history`
  * cuelga de `ticketKeys.detail`, así que la invalidación que ya existe lo

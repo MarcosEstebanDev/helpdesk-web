@@ -168,6 +168,23 @@ describe('TicketComments: chat y "Responder y esperar al cliente" (UX 2026-11-13
     );
   });
 
+  it('salir de la pantalla a mitad de camino no deja el ticket sin pasar a la espera', async () => {
+    // Con el cambio de estado encadenado en el `onSuccess` de `mutate()`, al
+    // desmontar TanStack Query no lo ejecutaba: respuesta enviada, estado intacto.
+    let liberar!: () => void;
+    vi.mocked(addComment).mockReturnValueOnce(
+      new Promise((ok) => (liberar = () => ok({ id: 'nuevo' }))),
+    );
+    const { unmount } = montar(enCurso());
+
+    await userEvent.type(screen.getByLabelText('Respuesta'), 'Hola');
+    await userEvent.click(screen.getByRole('button', { name: 'Responder y esperar al cliente' }));
+    unmount();
+    liberar();
+
+    await waitFor(() => expect(changeStatus).toHaveBeenCalledWith('tk1', 'WAITING_ON_CUSTOMER'));
+  });
+
   it('si la respuesta no sale, el estado no cambia', async () => {
     vi.mocked(addComment).mockRejectedValueOnce(new Error('caído'));
     montar(enCurso());

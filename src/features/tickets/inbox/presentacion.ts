@@ -30,6 +30,11 @@ export const describirSla = (
     };
   }
   const falta = new Date(sla.dueAt).getTime() - ahora.getTime();
+  // Venció después del último fetch y el barrido aún no lo marcó: es vencido
+  // igual. Sin esto la fila decía "vence en 1 min" hasta el próximo refresco.
+  if (falta <= 0) {
+    return { texto: `vencido hace ${duracion(-falta)}`, tono: 'peligro' };
+  }
   return {
     texto: `vence en ${duracion(falta)}`,
     tono: falta < UMBRAL_AVISO_MS ? 'aviso' : 'neutro',

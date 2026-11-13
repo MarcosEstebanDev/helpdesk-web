@@ -72,8 +72,13 @@ describe('TablaDeTickets (UX 2026-11-13)', () => {
   it('el asignado va en iniciales, y el tuyo se distingue', () => {
     deEquipo([ticket({ id: 'a', assigneeId: 'yo' }), ticket({ id: 'b', number: 13, assigneeId: 'otro' })]);
 
-    expect(screen.getByLabelText('Asignado a vos (ana.perez@acme.test)')).toHaveTextContent('AP');
-    expect(screen.getByLabelText('Asignado a bruno@acme.test')).toHaveTextContent('BR');
+    const mio = screen.getByText('Asignado a vos (ana.perez@acme.test)').parentElement!;
+    const otro = screen.getByText('Asignado a bruno@acme.test').parentElement!;
+    expect(mio).toHaveTextContent('AP');
+    expect(otro).toHaveTextContent('BR');
+    // El tuyo se distingue con el anillo.
+    expect(mio.className).toMatch(/ring-2/);
+    expect(otro.className).not.toMatch(/ring-2/);
   });
 
   it('la IA aparece junto al asunto solo si sugiere MÁS urgencia', () => {

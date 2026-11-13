@@ -6,16 +6,19 @@ import { useEffect, type RefObject } from 'react';
  * Si un atajo de la bandeja tiene que dejar pasar esta tecla.
  *
  * Lo importante es el primer caso: "j" escrita en la búsqueda es una letra, no
- * una orden. También se ignora con modificadores (Ctrl+J es del navegador) y
- * dentro de un diálogo, que tapa la bandeja aunque la bandeja siga montada.
+ * una orden. También se ignora con modificadores (Ctrl+J es del navegador),
+ * si otro componente ya la atendió, y dentro de un diálogo o un menú, que
+ * tapan la bandeja aunque la bandeja siga montada.
  */
 export function debeIgnorarTecla(e: KeyboardEvent): boolean {
-  if (e.ctrlKey || e.metaKey || e.altKey) return true;
+  if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return true;
   const target = e.target;
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return true;
-  return target.closest('[role="dialog"]') !== null;
+  // Diálogos, menús y listas tienen su propio teclado (Base UI): "j" ahí es
+  // búsqueda por tecleo, no "bajar en la bandeja".
+  return target.closest('[role="dialog"],[role="menu"],[role="listbox"]') !== null;
 }
 
 /** A qué fila moverse. `null` si la tecla no es de navegación o no hay filas. */

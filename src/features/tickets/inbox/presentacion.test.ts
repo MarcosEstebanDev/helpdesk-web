@@ -37,6 +37,15 @@ describe('describirSla (UX 2026-11-13)', () => {
     });
   });
 
+  it('un reloj que venció con la pantalla abierta dice vencido, no "vence en 1 min"', () => {
+    // El resumen es del último fetch: el barrido puede tardar en marcarlo.
+    expect(describirSla({ state: 'running', dueAt: en(-30) }, AHORA)).toEqual({
+      texto: 'vencido hace 30 min',
+      tono: 'peligro',
+    });
+    expect(describirSla({ state: 'running', dueAt: en(0) }, AHORA).tono).toBe('peligro');
+  });
+
   it('sin datos (VIEWER) no muestra nada', () => {
     expect(describirSla(undefined, AHORA)).toEqual({ texto: '—', tono: 'neutro' });
   });

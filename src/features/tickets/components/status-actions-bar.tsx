@@ -1,10 +1,12 @@
 'use client';
 
+import { useIsMutating } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { useAvisos } from '@/components/ui/toast';
 import { useChangeStatus } from '@/features/tickets/queries';
 import { accionesDesde, type AccionDeEstado } from '@/features/tickets/status-actions';
 import { ApiError } from '@/lib/api/client';
+import { ticketMutationKeys } from '@/lib/query/keys';
 import type { TicketStatus } from '@/lib/api/types';
 
 /**
@@ -26,6 +28,10 @@ export function AccionesDeEstado({
 }) {
   const avisos = useAvisos();
   const cambiarEstado = useChangeStatus(ticketId);
+  // Cualquier cambio de estado en vuelo para este ticket, también el de
+  // "Responder y esperar al cliente": mandar otro encima daría un 409.
+  const enVuelo =
+    useIsMutating({ mutationKey: ticketMutationKeys.cambioDeEstado(ticketId) }) > 0;
   const acciones = accionesDesde(status);
 
   if (acciones.length === 0) {
@@ -54,7 +60,7 @@ export function AccionesDeEstado({
           key={accion.to}
           size="sm"
           variant={accion.to === 'RESOLVED' ? 'default' : 'outline'}
-          disabled={cambiarEstado.isPending}
+          disabled={enVuelo}
           onClick={() => transicionar(accion)}
         >
           {accion.label}

@@ -20,9 +20,12 @@ export function PestanasDeEstado({
   onChange: (estado: EstadoDePestana) => void;
 }) {
   return (
+    // Botones con `aria-pressed` y no `role="tab"`: no cambian de panel, filtran
+    // la misma lista. Declarar pestañas sin tabpanel ni flechas prometería al
+    // lector de pantalla un teclado que no existe.
     <div
-      role="tablist"
-      aria-label="Estado"
+      role="group"
+      aria-label="Filtrar por estado"
       className="-mx-4 flex gap-1 overflow-x-auto border-b border-border px-4 sm:mx-0 sm:px-0"
     >
       {pestanasPara(actual).map((p) => {
@@ -32,8 +35,7 @@ export function PestanasDeEstado({
           <button
             key={p.estado || 'todos'}
             type="button"
-            role="tab"
-            aria-selected={elegida}
+            aria-pressed={elegida}
             onClick={() => onChange(p.estado)}
             className={cn(
               '-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm whitespace-nowrap transition-colors',

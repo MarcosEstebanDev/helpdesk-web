@@ -166,10 +166,12 @@ export function WsProvider({ children }: { children: ReactNode }) {
     });
 
     socket.on('comment.added', (msg: CommentAddedMessage) => {
-      // Solo el detalle: un comentario no cambia nada de lo que se ve en la lista.
+      // El detalle, y también las listas: desde UX 2026-11-13 la fila muestra
+      // el SLA que más apura, y la primera respuesta del equipo lo cambia.
       void queryClient.invalidateQueries({
         queryKey: ticketKeys.detail(msg.ticketId),
       });
+      void queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
     });
 
     // `ticket.assigned` / `ticket.unassigned` / `sla.breached` solo llegan a

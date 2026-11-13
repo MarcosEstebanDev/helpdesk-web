@@ -20,8 +20,9 @@ import {
   type ItemDeLinea,
 } from '@/features/tickets/detail/linea-de-tiempo';
 import {
+  EsperaNoAplicada,
   useAddComment,
-  useChangeStatus,
+  useResponderYEsperar,
   useTicketHistory,
 } from '@/features/tickets/queries';
 import { ApiError } from '@/lib/api/client';
@@ -83,7 +84,20 @@ export function TicketComments({
    */
   const [confirmando, setConfirmando] = useState<ModoDeEnvio | null>(null);
   const plantillas = useCannedResponses(esEquipo);
-  const cambiarEstado = useChangeStatus(ticket.id);
+  const responderYEsperar = useResponderYEsperar(ticket.id, {
+    onExito: () => avisos.exito('Respondido. El ticket espera al cliente'),
+    onError: (e) =>
+      e instanceof EsperaNoAplicada
+        ? // No se oculta que la respuesta SÍ salió: reintentarla la duplicaría.
+          avisos.error(
+            e.message,
+            e.causa instanceof ApiError ? e.causa.message : undefined,
+          )
+        : avisos.error(
+            'No se pudo enviar la respuesta',
+            e instanceof ApiError ? e.message : undefined,
+          ),
+  });
   // El historial solo lo puede pedir el equipo; de ahí salen los cambios de
   // estado que se intercalan. Comparte clave con la pestaña de historial.
   const historial = useTicketHistory(ticket.id, esEquipo);
@@ -139,31 +153,29 @@ export function TicketComments({
   }
 
   /**
-   * Manda el mensaje y, si se pidió, pasa el ticket a la espera. En ese
-   * ORDEN y encadenado: si la respuesta no sale, el estado no se toca —
-   * esperar al cliente sin haberle preguntado nada pausaría el SLA a cuenta
-   * de una pregunta que nunca le llegó.
+   * Manda el mensaje y, si se pidió, pasa el ticket a la espera. Los dos pasos
+   * viven en `useResponderYEsperar` (y no encadenados acá) para que salir de
+   * la pantalla a mitad de camino no deje el segundo sin hacer.
    */
   function enviar(modo: ModoDeEnvio) {
     const cuerpo = texto.trim();
     if (cuerpo === '') return;
     setConfirmando(null);
+    if (modo === 'esperar') {
+      responderYEsperar.mutate(cuerpo, {
+        // Solo vaciar el editor: si se desmontó, no hay editor que vaciar.
+        // Si falló el SEGUNDO paso la respuesta sí salió, así que también.
+        onSuccess: () => setTexto(''),
+        onError: (e) => {
+          if (e instanceof EsperaNoAplicada) setTexto('');
+        },
+      });
+      return;
+    }
     comentar.mutate(
       { body: cuerpo, visibility: nota ? 'INTERNAL' : 'PUBLIC' },
       {
-        onSuccess: () => {
-          setTexto('');
-          if (modo !== 'esperar') return;
-          cambiarEstado.mutate('WAITING_ON_CUSTOMER', {
-            onSuccess: () => avisos.exito('Respondido. El ticket espera al cliente'),
-            // No se oculta que la respuesta SÍ salió: reintentarla la duplicaría.
-            onError: (e) =>
-              avisos.error(
-                'La respuesta se envió, pero el ticket no pasó a esperar al cliente',
-                e instanceof ApiError ? e.message : undefined,
-              ),
-          });
-        },
+        onSuccess: () => setTexto(''),
         onError: (e) =>
           avisos.error(
             nota ? 'No se pudo guardar la nota' : 'No se pudo enviar la respuesta',
@@ -187,7 +199,7 @@ export function TicketComments({
     intentar('responder');
   }
 
-  const ocupado = comentar.isPending || cambiarEstado.isPending;
+  const ocupado = comentar.isPending || responderYEsperar.isPending;
 
   return (
     <div className="space-y-4">

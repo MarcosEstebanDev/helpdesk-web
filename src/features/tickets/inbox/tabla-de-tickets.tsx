@@ -258,7 +258,12 @@ function Asignado({
   directorio: Directorio;
 }) {
   if (id === null) {
-    return <span className="text-xs text-muted-foreground" aria-label="Sin asignar">—</span>;
+    return (
+      <span className="text-xs text-muted-foreground">
+        <span aria-hidden>—</span>
+        <span className="sr-only">Sin asignar</span>
+      </span>
+    );
   }
   const email = directorio(id)?.email;
   const esMio = id === miId;
@@ -268,13 +273,15 @@ function Asignado({
   return (
     <Tooltip contenido={descripcion}>
       <span
-        aria-label={descripcion}
         className={cn(
           'inline-flex size-6 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground',
           esMio && 'bg-primary/10 text-primary ring-2 ring-primary',
         )}
       >
-        {email ? iniciales(email) : '?'}
+        <span aria-hidden>{email ? iniciales(email) : '?'}</span>
+        {/* Texto y no `aria-label`: en un <span> sin rol el lector lo ignora y
+            dentro del enlace de la fila se leía "AP". */}
+        <span className="sr-only">{descripcion}</span>
       </span>
     </Tooltip>
   );

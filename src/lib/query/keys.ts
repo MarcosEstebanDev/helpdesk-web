@@ -32,6 +32,16 @@ export const ticketKeys = {
 };
 
 /**
+ * Claves de MUTACIÓN (no de caché). Todo lo que cambia el estado de un ticket
+ * comparte la suya, para que `useIsMutating` deje saber desde cualquier
+ * componente que hay un cambio en vuelo y no se mande otro encima (un 409).
+ */
+export const ticketMutationKeys = {
+  cambioDeEstado: (ticketId: string) =>
+    ['tickets', ticketId, 'cambio-de-estado'] as const,
+};
+
+/**
  * Catálogo de etiquetas (`GET /tags`, AGENT o superior). Renombrar o borrar
  * una etiqueta cambia también cómo se pintan los tickets: quien la cambia
  * invalida esto Y `ticketKeys.all`.
