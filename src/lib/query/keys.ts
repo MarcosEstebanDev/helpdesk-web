@@ -16,6 +16,10 @@ export const ticketKeys = {
   lists: () => [...ticketKeys.all, 'list'] as const,
   list: (filtros: Record<string, unknown> = {}) =>
     [...ticketKeys.lists(), filtros] as const,
+  /** Conteos por estado de las pestañas. Cuelga de `lists()` a propósito: todo
+   *  lo que refresca la bandeja (realtime, mutaciones) refresca los números. */
+  counts: (filtros: Record<string, unknown> = {}) =>
+    [...ticketKeys.lists(), 'counts', filtros] as const,
   details: () => [...ticketKeys.all, 'detail'] as const,
   detail: (ticketId: string) => [...ticketKeys.details(), ticketId] as const,
   /** Rastro de auditoría de un ticket (`GET /tickets/:id/history`). */

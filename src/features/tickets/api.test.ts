@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getTriage, listTickets } from './api';
+import { countTickets, getTriage, listTickets } from './api';
 import { ApiError, apiFetch } from '@/lib/api/client';
 
 vi.mock('@/lib/api/client', async (original) => ({
@@ -36,6 +36,35 @@ describe('listTickets', () => {
     await listTickets({ q: 'pdf en blanco' });
 
     expect(apiFetch).toHaveBeenLastCalledWith('/tickets?q=pdf+en+blanco');
+  });
+});
+
+describe('countTickets', () => {
+  it('manda los mismos filtros que el listado (búsqueda y etiquetas incluidas)', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce({});
+
+    await countTickets({ assigneeId: 'u1', tagIds: ['a', 'b'], q: 'pdf' });
+
+    expect(apiFetch).toHaveBeenLastCalledWith(
+      '/tickets/counts?assigneeId=u1&tagId=a&tagId=b&q=pdf',
+    );
+  });
+
+  it('sin filtros pide la ruta pelada', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce({});
+
+    await countTickets({});
+
+    expect(apiFetch).toHaveBeenLastCalledWith('/tickets/counts');
+  });
+
+  it('ignora el estado aunque venga en los filtros de la bandeja', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce({});
+
+    // Las pestañas SON el estado: contarlas filtrando por uno daría ceros en el resto.
+    await countTickets({ status: 'OPEN', q: 'pdf' } as never);
+
+    expect(apiFetch).toHaveBeenLastCalledWith('/tickets/counts?q=pdf');
   });
 });
 

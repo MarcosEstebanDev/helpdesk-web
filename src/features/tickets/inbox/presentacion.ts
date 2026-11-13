@@ -1,4 +1,4 @@
-import type { SlaSummary } from '@/lib/types';
+import type { SlaSummary } from '@/lib/api/types';
 
 export type TonoSla = 'neutro' | 'aviso' | 'peligro';
 

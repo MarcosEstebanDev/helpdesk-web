@@ -70,6 +70,13 @@ describe('AiTriageCard', () => {
     rerender(<AiTriageCard estado="error" prioridadActual="LOW" />);
     expect(screen.getByText(/no se pudo consultar/i)).toBeInTheDocument();
   });
+
+  it('sin servicio de IA dice que no está disponible, no "analizando" para siempre', () => {
+    render(<AiTriageCard estado={{ status: 'disabled' }} prioridadActual="LOW" />);
+
+    expect(screen.getByText('La IA no está disponible.')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
 });
 
 describe('AiTriagePanel', () => {

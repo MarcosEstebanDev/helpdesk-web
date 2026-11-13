@@ -176,7 +176,25 @@ export interface TicketSummary {
    * clave no existe, no viene vacía.
    */
   tags?: Tag[];
+  /** Solo en la BANDEJA y solo para AGENT o superior: quién abrió el ticket. */
+  requesterEmail?: string;
+  /** Solo en la BANDEJA y solo para AGENT o superior: el reloj que más apura. */
+  slaSummary?: SlaSummary;
 }
+
+/**
+ * Resumen del SLA para una fila de la bandeja (`summarizeSla` del backend).
+ * Un ticket resuelto o cerrado viene como `none` aunque algún reloj se haya
+ * incumplido: en la bandeja ya no pide atención.
+ */
+export type SlaSummary =
+  | { state: 'none' }
+  | { state: 'paused' }
+  | { state: 'running'; dueAt: string }
+  | { state: 'breached'; since: string };
+
+/** `GET /tickets/counts`: mismos filtros que el listado salvo el estado. */
+export type TicketCounts = Record<TicketStatus, number>;
 
 /**
  * `INTERNAL` es una nota del equipo (ADR-0028 del backend): el cliente no la
@@ -288,6 +306,8 @@ export interface EffectiveSlaTarget {
  */
 export type TicketTriage =
   | { status: 'pending' }
+  /** El backend no tiene servicio de IA configurado: no va a llegar nunca. */
+  | { status: 'disabled' }
   | {
       status: 'ready';
       category: string;

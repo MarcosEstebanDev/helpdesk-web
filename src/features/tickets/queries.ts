@@ -40,6 +40,19 @@ export function useTickets(filtros: FiltrosDeBandeja = {}) {
   });
 }
 
+/**
+ * Números de las pestañas. Se le quita el estado a los filtros ANTES de armar
+ * la clave: así cambiar de pestaña no pide los conteos otra vez.
+ */
+export function useTicketCounts(filtros: FiltrosDeBandeja = {}) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { status, ...sinEstado } = filtros;
+  return useQuery({
+    queryKey: ticketKeys.counts(sinEstado),
+    queryFn: () => api.countTickets(sinEstado),
+  });
+}
+
 export function useTicket(ticketId: string) {
   return useQuery({
     queryKey: ticketKeys.detail(ticketId),
