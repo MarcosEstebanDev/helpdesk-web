@@ -2,6 +2,7 @@ import { ApiError, apiFetch } from '@/lib/api/client';
 import type {
   AuditEntry,
   CommentVisibility,
+  TicketCounts,
   TicketDetail,
   TicketPage,
   TicketPriority,
@@ -25,9 +26,10 @@ export interface ListTicketsParams {
   cursor?: string;
 }
 
-export function listTickets(params: ListTicketsParams): Promise<TicketPage> {
-  const query = new URLSearchParams();
-  if (params.status) query.set('status', params.status);
+/** Los filtros que comparten el listado y los conteos (todo salvo estado y página). */
+export type TicketFilterParams = Omit<ListTicketsParams, 'status' | 'limit' | 'cursor'>;
+
+function filtrosEnQuery(query: URLSearchParams, params: TicketFilterParams): void {
   if (params.assigneeId) query.set('assigneeId', params.assigneeId);
   // Faltaba: el filtro "Los que abrí yo" de un VIEWER se armaba bien en
   // `filtrosDeBandeja` y se perdía acá, así que no filtraba nada.
@@ -36,11 +38,29 @@ export function listTickets(params: ListTicketsParams): Promise<TicketPage> {
   // `append` y no `set`: el backend espera `?tagId=a&tagId=b`.
   for (const tagId of params.tagIds ?? []) query.append('tagId', tagId);
   if (params.q) query.set('q', params.q);
+}
+
+export function listTickets(params: ListTicketsParams): Promise<TicketPage> {
+  const query = new URLSearchParams();
+  if (params.status) query.set('status', params.status);
+  filtrosEnQuery(query, params);
   if (params.limit !== undefined) query.set('limit', String(params.limit));
   if (params.cursor) query.set('cursor', params.cursor);
 
   const qs = query.toString();
   return apiFetch<TicketPage>(`/tickets${qs ? `?${qs}` : ''}`);
+}
+
+/**
+ * Cuántos tickets hay en cada estado (las pestañas de la bandeja). Ignora el
+ * estado aunque venga: las pestañas SON el estado, y contarlas filtrando por
+ * uno daría ceros en todas las demás.
+ */
+export function countTickets(params: TicketFilterParams): Promise<TicketCounts> {
+  const query = new URLSearchParams();
+  filtrosEnQuery(query, params);
+  const qs = query.toString();
+  return apiFetch<TicketCounts>(`/tickets/counts${qs ? `?${qs}` : ''}`);
 }
 
 export function getTicket(ticketId: string): Promise<TicketDetail> {

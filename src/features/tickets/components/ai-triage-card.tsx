@@ -113,6 +113,12 @@ function Contenido({
     );
   }
 
+  if (estado.status === 'disabled') {
+    return (
+      <p className="text-xs text-muted-foreground">La IA no está disponible.</p>
+    );
+  }
+
   if (estado.status === 'pending') {
     return (
       <p role="status" className="text-xs text-muted-foreground">

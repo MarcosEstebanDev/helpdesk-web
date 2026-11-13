@@ -16,6 +16,10 @@ export const ticketKeys = {
   lists: () => [...ticketKeys.all, 'list'] as const,
   list: (filtros: Record<string, unknown> = {}) =>
     [...ticketKeys.lists(), filtros] as const,
+  /** Conteos por estado de las pestañas. Cuelga de `lists()` a propósito: todo
+   *  lo que refresca la bandeja (realtime, mutaciones) refresca los números. */
+  counts: (filtros: Record<string, unknown> = {}) =>
+    [...ticketKeys.lists(), 'counts', filtros] as const,
   details: () => [...ticketKeys.all, 'detail'] as const,
   detail: (ticketId: string) => [...ticketKeys.details(), ticketId] as const,
   /** Rastro de auditoría de un ticket (`GET /tickets/:id/history`). */
@@ -25,6 +29,16 @@ export const ticketKeys = {
    *  proposito: todo lo que ya invalida el detalle la alcanza. */
   triage: (ticketId: string) =>
     [...ticketKeys.detail(ticketId), 'triage'] as const,
+};
+
+/**
+ * Claves de MUTACIÓN (no de caché). Todo lo que cambia el estado de un ticket
+ * comparte la suya, para que `useIsMutating` deje saber desde cualquier
+ * componente que hay un cambio en vuelo y no se mande otro encima (un 409).
+ */
+export const ticketMutationKeys = {
+  cambioDeEstado: (ticketId: string) =>
+    ['tickets', ticketId, 'cambio-de-estado'] as const,
 };
 
 /**

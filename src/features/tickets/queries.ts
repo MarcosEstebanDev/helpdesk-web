@@ -9,7 +9,7 @@ import {
 import * as api from '@/features/tickets/api';
 import type { FiltrosDeBandeja } from '@/features/tickets/filters';
 import { ApiError } from '@/lib/api/client';
-import { ticketKeys } from '@/lib/query/keys';
+import { ticketKeys, ticketMutationKeys } from '@/lib/query/keys';
 import type {
   CommentVisibility,
   TicketPriority,
@@ -37,6 +37,19 @@ export function useTickets(filtros: FiltrosDeBandeja = {}) {
       }),
     initialPageParam: null as string | null,
     getNextPageParam: (ultima) => ultima.nextCursor,
+  });
+}
+
+/**
+ * Números de las pestañas. Se le quita el estado a los filtros ANTES de armar
+ * la clave: así cambiar de pestaña no pide los conteos otra vez.
+ */
+export function useTicketCounts(filtros: FiltrosDeBandeja = {}) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { status, ...sinEstado } = filtros;
+  return useQuery({
+    queryKey: ticketKeys.counts(sinEstado),
+    queryFn: () => api.countTickets(sinEstado),
   });
 }
 
@@ -107,11 +120,9 @@ export function useAddComment(ticketId: string) {
   return useMutation({
     mutationFn: (input: { body: string; visibility: CommentVisibility }) =>
       api.addComment(ticketId, input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ticketKeys.detail(ticketId),
-      });
-    },
+    // Las listas también: la primera respuesta del equipo cambia el SLA que
+    // muestra la fila de la bandeja.
+    onSuccess: () => invalidarTicket(queryClient, ticketId),
   });
 }
 
@@ -119,8 +130,53 @@ export function useChangeStatus(ticketId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: ticketMutationKeys.cambioDeEstado(ticketId),
     mutationFn: (status: TicketStatus) => api.changeStatus(ticketId, status),
     onSuccess: () => invalidarTicket(queryClient, ticketId),
+  });
+}
+
+/** La respuesta salió, pero el ticket no pasó a la espera. */
+export class EsperaNoAplicada extends Error {
+  constructor(readonly causa: unknown) {
+    super('La respuesta se envió, pero el ticket no pasó a esperar al cliente');
+  }
+}
+
+/**
+ * "Responder y esperar al cliente" (UX 2026-11-13) como UNA mutación.
+ *
+ * Los dos pasos van dentro de `mutationFn`, y los avisos en las opciones del
+ * hook, no en las de `mutate()`: TanStack Query v5 NO ejecuta los callbacks de
+ * `mutate()` si el componente se desmontó, así que con el cambio de estado
+ * encadenado ahí, volver a la bandeja enseguida dejaba la respuesta enviada y
+ * el ticket sin pasar a la espera, sin aviso. Orden y regla: si la respuesta
+ * no sale, el estado no se toca (pausaría el SLA por una pregunta que el
+ * cliente nunca recibió).
+ *
+ * Comparte `mutationKey` con `useChangeStatus`: mientras corre, los botones de
+ * estado de la cabecera se deshabilitan.
+ */
+export function useResponderYEsperar(
+  ticketId: string,
+  avisos: { onExito: () => void; onError: (error: unknown) => void },
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationKey: ticketMutationKeys.cambioDeEstado(ticketId),
+    mutationFn: async (body: string) => {
+      await api.addComment(ticketId, { body, visibility: 'PUBLIC' });
+      try {
+        await api.changeStatus(ticketId, 'WAITING_ON_CUSTOMER');
+      } catch (e) {
+        throw new EsperaNoAplicada(e);
+      }
+    },
+    onSuccess: avisos.onExito,
+    onError: avisos.onError,
+    // Aun si falló el segundo paso, el comentario existe: hay que refrescar.
+    onSettled: () => invalidarTicket(queryClient, ticketId),
   });
 }
 

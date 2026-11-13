@@ -22,6 +22,31 @@ export function clasesDeColor(color: TagColor): string {
   return CLASES[color] ?? CLASES.gray;
 }
 
+/** El mismo color como punto (bandeja): saturado, porque es chico. */
+const PUNTO: Record<TagColor, string> = {
+  gray: 'bg-zinc-400',
+  red: 'bg-red-500',
+  orange: 'bg-orange-500',
+  yellow: 'bg-yellow-500',
+  green: 'bg-green-500',
+  teal: 'bg-teal-500',
+  blue: 'bg-blue-500',
+  purple: 'bg-purple-500',
+};
+
+/** Etiqueta discreta: punto de color + nombre, sin fondo (UX 2026-11-13). */
+export function TagDot({ tag }: { tag: Tag }) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+      <span
+        aria-hidden
+        className={cn('size-2 shrink-0 rounded-full', PUNTO[tag.color] ?? PUNTO.gray)}
+      />
+      <span className="truncate">{tag.name}</span>
+    </span>
+  );
+}
+
 export function TagLozenge({
   tag,
   className,

@@ -47,4 +47,14 @@ describe('VistasEnNav (ADR-0033)', () => {
       /compartida/i,
     );
   });
+
+  it('agrupa las vistas en las del equipo y las propias', async () => {
+    montar();
+
+    const equipo = await screen.findByRole('list', { name: 'Vistas del equipo' });
+    const mias = screen.getByRole('list', { name: 'Mis vistas' });
+    expect(equipo).toHaveTextContent('Sin asignar');
+    expect(equipo).not.toHaveTextContent('Mis urgentes');
+    expect(mias).toHaveTextContent('Mis urgentes');
+  });
 });
