@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/primitives';
 import { useAvisos } from '@/components/ui/toast';
 import { useSession } from '@/features/auth/session';
+import { useBusinessHours } from '@/features/business-hours/queries';
 import * as slaApi from '@/features/sla/api';
 import { ApiError } from '@/lib/api/client';
 import { slaKeys } from '@/lib/query/keys';
@@ -40,6 +41,10 @@ export default function SlaSettingsPage() {
     // Un AGENT que llegue por la URL recibiría un 403; ni se intenta.
     enabled: user?.role === 'ADMIN',
   });
+  // Solo para saber la unidad: con horario laboral los objetivos se cuentan
+  // en horas HÁBILES (ADR-0034 del backend); en 24/7, de reloj.
+  const horario = useBusinessHours(user?.role === 'ADMIN');
+  const unidad = horario.data?.mode === '24_7' ? '' : ' hábiles';
 
   if (user?.role !== 'ADMIN') {
     return (
@@ -54,9 +59,10 @@ export default function SlaSettingsPage() {
       <div className="max-w-prose">
         <h1 className="text-xl font-semibold tracking-tight">SLA</h1>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          Lo que la organización se compromete a cumplir, por prioridad. Los
-          tickets ya abiertos conservan el objetivo con el que nacieron: cambiar
-          esto solo afecta a los nuevos.
+          Lo que la organización se compromete a cumplir, por prioridad
+          {unidad === '' ? ', en horas de reloj (atención 24/7)' : ', en horas hábiles del horario laboral'}
+          . Los tickets ya abiertos conservan el objetivo con el que nacieron:
+          cambiar esto solo afecta a los nuevos.
         </p>
       </div>
 
@@ -80,7 +86,7 @@ export default function SlaSettingsPage() {
       ) : (
         <div className="space-y-2">
           {data.map((objetivo) => (
-            <FilaPrioridad key={objetivo.priority} objetivo={objetivo} />
+            <FilaPrioridad key={objetivo.priority} objetivo={objetivo} unidad={unidad} />
           ))}
         </div>
       )}
@@ -88,7 +94,14 @@ export default function SlaSettingsPage() {
   );
 }
 
-function FilaPrioridad({ objetivo }: { objetivo: EffectiveSlaTarget }) {
+function FilaPrioridad({
+  objetivo,
+  unidad,
+}: {
+  objetivo: EffectiveSlaTarget;
+  /** `' hábiles'` con horario laboral, `''` en 24/7. */
+  unidad: string;
+}) {
   const queryClient = useQueryClient();
   const avisos = useAvisos();
   const [editando, setEditando] = useState(false);
@@ -158,8 +171,9 @@ function FilaPrioridad({ objetivo }: { objetivo: EffectiveSlaTarget }) {
 
         {editando ? null : (
           <span className="text-sm text-muted-foreground">
-            responder en {formatear(objetivo.responseMinutes)} · resolver en{' '}
-            {formatear(objetivo.resolutionMinutes)}
+            responder en {formatear(objetivo.responseMinutes)}
+            {unidad} · resolver en {formatear(objetivo.resolutionMinutes)}
+            {unidad}
           </span>
         )}
 

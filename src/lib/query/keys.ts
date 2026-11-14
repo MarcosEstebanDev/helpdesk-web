@@ -64,6 +64,16 @@ export const viewKeys = {
   all: ['views'] as const,
 };
 
+/**
+ * Horario laboral (ADR-0034 del backend). `config` es del ADMIN; `status` lo
+ * pide el cliente para el aviso de fuera de horario. Los invalida quien guarda.
+ */
+export const businessHoursKeys = {
+  all: ['business-hours'] as const,
+  config: ['business-hours', 'config'] as const,
+  status: ['business-hours', 'status'] as const,
+};
+
 /** Configuración de SLA de la organización (`GET /sla-policy`, solo ADMIN). */
 export const slaKeys = {
   policy: ['sla', 'policy'] as const,
