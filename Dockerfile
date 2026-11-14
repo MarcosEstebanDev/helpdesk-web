@@ -10,8 +10,9 @@ WORKDIR /app
 # ---- deps: todas las dependencias (incluye dev, para buildear) ----
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile
+# Sin `--mount=type=cache`: Railway exige que el id del caché lleve el id del
+# servicio como prefijo, y eso ataría el Dockerfile a un servicio concreto.
+RUN pnpm install --frozen-lockfile
 
 # ---- build: compila Next -> .next/standalone ----
 FROM base AS build

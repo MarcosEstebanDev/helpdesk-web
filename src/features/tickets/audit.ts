@@ -223,6 +223,9 @@ export function describirEntrada(
     case 'sla.policy_changed':
       return { papel, frase: 'Cambió la política de SLA de la organización' };
 
+    case 'business_hours.changed':
+      return { papel, frase: 'Cambió el horario laboral' };
+
     case 'ticket.tags_changed':
       // Los nombres vienen en la metadata (ADR-0031): son los que tenía la
       // etiqueta EN ESE MOMENTO, aunque después se haya renombrado o borrado.

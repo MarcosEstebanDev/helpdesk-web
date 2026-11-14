@@ -17,6 +17,14 @@ vi.mock('@/features/tickets/api', () => ({
   getHistory: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('@/features/canned-responses/api', () => ({ listCannedResponses: vi.fn() }));
+// El aviso de fuera de horario (solo VIEWER) pide el estado: abierto, sin aviso.
+vi.mock('@/features/business-hours/api', () => ({
+  getBusinessStatus: vi.fn().mockResolvedValue({
+    open: true,
+    nextOpening: null,
+    timeZone: 'America/Argentina/Buenos_Aires',
+  }),
+}));
 
 const rolActual = { valor: 'AGENT' as Role };
 

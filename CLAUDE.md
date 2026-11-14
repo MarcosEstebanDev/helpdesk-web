@@ -63,6 +63,18 @@ usa el Dockerfile y Vercel lo ignora. Pasos en `helpdesk-api/docs/DEPLOY.md`.
 Nota vieja corregida: `feat/members-endpoint` del backend YA está en `dev` y en
 `main` (se mergeó el 2026-09-10); lo de "sin mergear" de más abajo es historia.
 
+## Horario laboral (2026-11-13, ADR-0034 del backend)
+
+Rama `feat/horario-laboral`. `features/business-hours/`: `api.ts`,
+`queries.ts` (`useBusinessHours` ADMIN, `useBusinessStatus` cada 5 min),
+`format.ts` (fechas en la zona de la ORGANIZACIÓN, con "hoy"/"mañana"),
+`week-form` (interruptor 24/7 que deshabilita sin borrar), `exceptions-list`
+(borrado confirmado en la fila; precarga de feriados del año actual y el
+siguiente) y `aviso-fuera-de-horario` (solo VIEWER: en "Abrir ticket" y sobre
+la caja de respuesta). `/settings/horario` solo ADMIN. La pantalla de SLA dice
+"horas hábiles" salvo en 24/7. La bandeja muestra la FECHA de vencimiento si
+falta más de un día (en la zona del navegador: no conoce la de la org).
+
 ## UX de bandeja y detalle (2026-11-13, rama `feat/ux-bandeja-detalle`)
 
 Spec y plan en `helpdesk-api/docs/superpowers/`. Principio: **color solo para

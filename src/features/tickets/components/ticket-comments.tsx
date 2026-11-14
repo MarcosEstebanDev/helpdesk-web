@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, Textarea } from '@/components/ui/primitives';
 import { useAvisos } from '@/components/ui/toast';
 import { useSession } from '@/features/auth/session';
+import { AvisoFueraDeHorario } from '@/features/business-hours/components/aviso-fuera-de-horario';
 import {
   CannedResponsePicker,
   insertAtCursor,
@@ -230,6 +231,7 @@ export function TicketComments({
         </p>
       ) : (
         <form onSubmit={onSubmit} className="space-y-2">
+          <AvisoFueraDeHorario esCliente={user?.role === 'VIEWER'} />
           {esEquipo ? (
             <div className="flex items-center justify-between gap-2">
               <SelectorVisibilidad valor={visibilidad} onChange={cambiarVisibilidad} />

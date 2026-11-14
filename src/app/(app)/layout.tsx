@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  CalendarClock,
   Inbox,
   LogOut,
   Menu,
@@ -236,6 +237,7 @@ interface Destino {
 const DESTINOS: Destino[] = [
   { href: '/tickets', etiqueta: 'Tickets', icono: Inbox },
   { href: '/settings/sla', etiqueta: 'SLA', icono: Timer, soloAdmin: true },
+  { href: '/settings/horario', etiqueta: 'Horario', icono: CalendarClock, soloAdmin: true },
   { href: '/settings/etiquetas', etiqueta: 'Etiquetas', icono: Tags, soloAdmin: true },
   {
     href: '/settings/respuestas',

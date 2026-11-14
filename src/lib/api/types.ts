@@ -260,6 +260,7 @@ export const AUDIT_ACTIONS = [
   'sla.breached',
   'sla.policy_changed',
   'ticket.tags_changed',
+  'business_hours.changed',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -284,6 +285,46 @@ export interface AuditEntry {
 }
 
 // -------------------------------------------------------------------- SLA
+
+/**
+ * Horario laboral de la organización (ADR-0034 del backend). Sin configurar
+ * rige L–V 08:00–18:00 en Argentina (`source: 'default'`). En `24_7` el SLA
+ * cuenta horas de reloj; la semana se conserva para cuando se vuelva.
+ */
+export type BusinessHoursMode = 'business_hours' | '24_7';
+
+/** Una fecha (LOCAL de la organización) que pisa la semana tipo. */
+export interface CalendarException {
+  id: string;
+  /** `YYYY-MM-DD`. */
+  date: string;
+  /** `false` = no hábil (feriado); `true` = día hábil extra. */
+  working: boolean;
+  name: string;
+}
+
+export interface BusinessHoursInput {
+  mode: BusinessHoursMode;
+  timeZone: string;
+  /** 1 = lunes … 7 = domingo. */
+  weekdays: number[];
+  /** `HH:MM`. */
+  opensAt: string;
+  closesAt: string;
+}
+
+export interface BusinessHours extends BusinessHoursInput {
+  source: 'default' | 'organization';
+  exceptions: CalendarException[];
+}
+
+/** Lo único del horario que ve el cliente (`GET /business-hours/status`). */
+export interface BusinessStatus {
+  open: boolean;
+  /** `null` si está abierto ahora. */
+  nextOpening: string | null;
+  timeZone: string;
+}
 
 export interface EffectiveSlaTarget {
   priority: TicketPriority;

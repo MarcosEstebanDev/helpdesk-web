@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/primitives';
 import { useAvisos } from '@/components/ui/toast';
 import { useSession } from '@/features/auth/session';
+import { AvisoFueraDeHorario } from '@/features/business-hours/components/aviso-fuera-de-horario';
 import { crearDirectorio } from '@/features/members/directory';
 import { useMembers } from '@/features/members/queries';
 import {
@@ -354,6 +355,7 @@ function NuevoTicket({ onListo }: { onListo: () => void }) {
   const [priority, setPriority] = useState<TicketPriority>('NORMAL');
   const avisos = useAvisos();
   const crear = useCreateTicket();
+  const { user } = useSession();
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -370,6 +372,10 @@ function NuevoTicket({ onListo }: { onListo: () => void }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {/* Fuera de horario el cliente puede abrirlo igual: queda en cola y
+          sabe cuándo lo van a ver (ADR-0034). */}
+      <AvisoFueraDeHorario esCliente={user?.role === 'VIEWER'} />
+
       <div className="space-y-1.5">
         <Label htmlFor="subject">Asunto</Label>
         <Input
