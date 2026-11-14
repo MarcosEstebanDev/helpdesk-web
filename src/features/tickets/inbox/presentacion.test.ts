@@ -25,9 +25,15 @@ describe('describirSla (UX 2026-11-13)', () => {
       texto: 'vence en 5 h',
       tono: 'neutro',
     });
-    expect(describirSla({ state: 'running', dueAt: en(50 * 60) }, AHORA).texto).toBe(
-      'vence en 2 d',
-    );
+    // Más de un día: la fecha, porque "en 2 d" engaña con fines de semana y
+    // horario laboral de por medio (ADR-0034). AHORA + 50 h = dom 15/11 14:00Z.
+    expect(
+      describirSla(
+        { state: 'running', dueAt: en(50 * 60) },
+        AHORA,
+        'America/Argentina/Buenos_Aires',
+      ),
+    ).toEqual({ texto: 'vence dom 15/11 11:00', tono: 'neutro' });
   });
 
   it('incumplido es peligro y dice hace cuánto', () => {

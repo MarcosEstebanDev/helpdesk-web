@@ -1,9 +1,13 @@
+import { vencimientoLegible } from '@/features/business-hours/format';
 import type { SlaSummary } from '@/lib/api/types';
 
 export type TonoSla = 'neutro' | 'aviso' | 'peligro';
 
 /** Faltando menos que esto, el SLA de una fila se pinta en ámbar. */
 const UMBRAL_AVISO_MS = 2 * 60 * 60 * 1000;
+
+/** Más allá de esto el vencimiento se muestra como fecha (ADR-0034). */
+const UN_DIA_MS = 24 * 60 * 60 * 1000;
 
 const duracion = (ms: number): string => {
   const min = Math.max(1, Math.round(ms / 60_000));
@@ -20,6 +24,8 @@ const duracion = (ms: number): string => {
 export const describirSla = (
   sla: SlaSummary | undefined,
   ahora: Date,
+  /** La bandeja no conoce la zona de la organización: sin ella, la del navegador. */
+  timeZone?: string,
 ): { texto: string; tono: TonoSla } => {
   if (sla === undefined || sla.state === 'none') return { texto: '—', tono: 'neutro' };
   if (sla.state === 'paused') return { texto: 'en pausa', tono: 'neutro' };
@@ -34,6 +40,9 @@ export const describirSla = (
   // igual. Sin esto la fila decía "vence en 1 min" hasta el próximo refresco.
   if (falta <= 0) {
     return { texto: `vencido hace ${duracion(-falta)}`, tono: 'peligro' };
+  }
+  if (falta > UN_DIA_MS) {
+    return { texto: vencimientoLegible(sla.dueAt, timeZone), tono: 'neutro' };
   }
   return {
     texto: `vence en ${duracion(falta)}`,
