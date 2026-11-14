@@ -97,6 +97,35 @@ export interface EntradaDescrita {
   accionCruda?: string;
 }
 
+function nombresDe(valor: unknown): string[] {
+  if (!Array.isArray(valor)) return [];
+  return valor
+    .map((v) => comoObjeto(v)?.name)
+    .filter((n): n is string => typeof n === 'string' && n !== '');
+}
+
+/** "bug", "bug y vip", "bug, vip y web". */
+function enumerar(nombres: string[]): string {
+  if (nombres.length <= 1) return nombres.join('');
+  return `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}`;
+}
+
+function parte(verbo: string, nombres: string[]): string {
+  const sustantivo = nombres.length === 1 ? 'la etiqueta' : 'las etiquetas';
+  return `${verbo} ${sustantivo} ${enumerar(nombres)}`;
+}
+
+function fraseDeEtiquetas(meta: Record<string, unknown> | null): string {
+  const agregadas = nombresDe(meta?.added);
+  const quitadas = nombresDe(meta?.removed);
+  if (agregadas.length === 0 && quitadas.length === 0) {
+    return 'Cambió las etiquetas';
+  }
+  if (quitadas.length === 0) return parte('Agregó', agregadas);
+  if (agregadas.length === 0) return parte('Quitó', quitadas);
+  return `${parte('Agregó', agregadas)}; ${parte('quitó', quitadas)}`;
+}
+
 export function describirEntrada(
   entrada: AuditEntry,
   participantes: Participantes,
@@ -121,6 +150,17 @@ export function describirEntrada(
       const hasta = comoEstado(meta?.to);
       if (desde === null || hasta === null) {
         return { papel, frase: 'Cambió el estado' };
+      }
+      // La vuelta sola desde la espera (ADR-0029): la hizo el sistema porque
+      // el cliente contestó. Sin decirlo, "El sistema cambió el estado" se lee
+      // como algo que pasó sin motivo.
+      if (meta?.automatic === true && meta?.trigger === 'customer_reply') {
+        return {
+          papel,
+          frase: 'El cliente respondió y el ticket volvió a curso',
+          automatico: true,
+          transicion: { desde, hasta },
+        };
       }
       return { papel, frase: 'Cambió el estado', transicion: { desde, hasta } };
     }
@@ -155,7 +195,13 @@ export function describirEntrada(
 
     case 'comment.added':
       // El cuerpo no viaja en el historial, y además está en la otra pestaña.
-      return { papel, frase: 'Comentó' };
+      // Los comentarios anteriores a las notas internas no traen `visibility`
+      // y eran todos públicos.
+      return {
+        papel,
+        frase:
+          meta?.visibility === 'INTERNAL' ? 'Dejó una nota interna' : 'Comentó',
+      };
 
     case 'sla.breached': {
       const kind = comoSlaKind(meta?.kind);
@@ -176,6 +222,14 @@ export function describirEntrada(
 
     case 'sla.policy_changed':
       return { papel, frase: 'Cambió la política de SLA de la organización' };
+
+    case 'business_hours.changed':
+      return { papel, frase: 'Cambió el horario laboral' };
+
+    case 'ticket.tags_changed':
+      // Los nombres vienen en la metadata (ADR-0031): son los que tenía la
+      // etiqueta EN ESE MOMENTO, aunque después se haya renombrado o borrado.
+      return { papel, frase: fraseDeEtiquetas(meta) };
 
     default:
       // El contrato se mantiene a mano: una acción nueva en el backend llega

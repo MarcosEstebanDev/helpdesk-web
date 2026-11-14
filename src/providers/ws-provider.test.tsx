@@ -161,7 +161,7 @@ describe('lo que llega invalida caché', () => {
     });
   });
 
-  it('un comentario refresca SOLO el detalle de ese ticket', () => {
+  it('un comentario refresca el detalle de ese ticket y las listas (SLA de la fila)', () => {
     // Un comentario no cambia nada de lo que se ve en la lista; invalidarla
     // haría recargar la bandeja entera de todo el que la tenga abierta.
     socketFalso.recibir('comment.added', { ticketId: 't-9' });
@@ -169,9 +169,24 @@ describe('lo que llega invalida caché', () => {
     expect(invalidarSpy).toHaveBeenCalledWith({
       queryKey: ticketKeys.detail('t-9'),
     });
-    expect(invalidarSpy).not.toHaveBeenCalledWith({
+    // La fila de la bandeja muestra el SLA, y una respuesta lo cambia.
+    expect(invalidarSpy).toHaveBeenCalledWith({
       queryKey: ticketKeys.lists(),
     });
+  });
+
+  it('las etiquetas refrescan detalle, historial y listas, pero no la IA', () => {
+    // Invalidar el detalle por prefijo también volvía a pedir la sugerencia de
+    // la IA, que no cambia por etiquetar.
+    socketFalso.recibir('ticket.tags_changed', { ticketId: 't-4', added: [], removed: [] });
+
+    expect(invalidarSpy).toHaveBeenCalledWith({
+      queryKey: ticketKeys.detail('t-4'),
+      exact: true,
+    });
+    expect(invalidarSpy).toHaveBeenCalledWith({ queryKey: ticketKeys.history('t-4') });
+    expect(invalidarSpy).toHaveBeenCalledWith({ queryKey: ticketKeys.lists() });
+    expect(invalidarSpy).not.toHaveBeenCalledWith({ queryKey: ticketKeys.detail('t-4') });
   });
 
   it('un cambio de estado refresca la lista y el detalle', () => {

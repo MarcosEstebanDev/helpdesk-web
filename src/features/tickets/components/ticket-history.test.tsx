@@ -8,6 +8,7 @@ import { TicketHistory } from './ticket-history';
 import { ToastProvider } from '@/components/ui/toast';
 import { crearDirectorio, SIN_DIRECTORIO } from '@/features/members/directory';
 import { ApiError } from '@/lib/api/client';
+import { makeQueryClient } from '@/lib/query/query-client';
 import type { Role } from '@/stores/auth-store';
 import type { TicketDetail } from '@/lib/api/types';
 
@@ -69,17 +70,26 @@ beforeEach(() => {
 });
 
 describe('TicketActivity', () => {
-  // El historial es un registro secundario: pedirlo al abrir cada ticket sería
-  // una petición extra por cada apertura para algo que casi nadie mira.
-  it('no pide el historial hasta que se abre la pestaña', async () => {
+  // Desde UX 2026-11-13 el chat del equipo intercala los cambios de estado, que
+  // salen del historial: se pide al entrar. La pestaña comparte la clave, así
+  // que abrirla NO dispara una segunda petición.
+  it('el chat y la pestaña de historial comparten una sola petición', async () => {
     vi.mocked(api.getHistory).mockResolvedValue([]);
-    render(envolver(<TicketActivity ticket={TICKET} directorio={SIN_DIRECTORIO} />));
-
-    expect(api.getHistory).not.toHaveBeenCalled();
-
-    await userEvent.click(screen.getByRole('tab', { name: /historial/i }));
+    // Con el `staleTime` de la app (`makeQueryClient`): con 0, cualquier
+    // observador nuevo vuelve a pedir y el test mediría otra configuración.
+    const cliente = makeQueryClient();
+    render(
+      <QueryClientProvider client={cliente}>
+        <ToastProvider>
+          <TicketActivity ticket={TICKET} directorio={SIN_DIRECTORIO} />
+        </ToastProvider>
+      </QueryClientProvider>,
+    );
 
     await waitFor(() => expect(api.getHistory).toHaveBeenCalledWith('tk1'));
+    await userEvent.click(screen.getByRole('tab', { name: /historial/i }));
+
+    expect(api.getHistory).toHaveBeenCalledTimes(1);
   });
 
   // `GET /tickets/:id/history` pide AGENT. Ofrecerle a un VIEWER una pestaña

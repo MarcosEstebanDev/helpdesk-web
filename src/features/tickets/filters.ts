@@ -23,6 +23,12 @@ export type FiltrosDeBandeja = {
   status?: TicketStatus;
   assigneeId?: string;
   requesterId?: string;
+  /** `true` o ausente, nunca `false`: ver la regla de las claves omitidas. */
+  aiSuggestsHigher?: true;
+  /** Etiquetas, ORDENADAS: el mismo conjunto tiene que ser la misma clave. */
+  tagIds?: string[];
+  /** Texto libre (ADR-0032), recortado. */
+  q?: string;
 };
 
 export function filtrosDeBandeja({
@@ -30,12 +36,22 @@ export function filtrosDeBandeja({
   soloMios,
   miId,
   esAgente,
+  soloIaUrgentes = false,
+  etiquetas = [],
+  busqueda = '',
 }: {
   estado: TicketStatus | '';
   soloMios: boolean;
   miId: string | undefined;
   /** Decide QUÉ significa "míos": ver abajo. */
   esAgente: boolean;
+  /** "La IA sugiere más urgencia". Solo cuenta para AGENT o superior. */
+  soloIaUrgentes?: boolean;
+  /** Ids de etiquetas: "al menos una de" (ADR-0031). Solo para el equipo. */
+  etiquetas?: string[];
+  /** Texto de la caja de búsqueda. Para todos los roles: el backend decide
+   *  qué comentarios cuentan (al cliente no le cuentan las notas internas). */
+  busqueda?: string;
 }): FiltrosDeBandeja {
   const filtros: FiltrosDeBandeja = {};
   if (estado !== '') filtros.status = estado;
@@ -50,6 +66,19 @@ export function filtrosDeBandeja({
     else filtros.requesterId = miId;
   }
 
+  // Para un VIEWER el backend respondería 403: la sugerencia es del equipo. No
+  // se manda en vez de mandarla y mostrar un error que el usuario no provocó.
+  if (soloIaUrgentes && esAgente) filtros.aiSuggestsHigher = true;
+
+  // Mismo criterio: las etiquetas son del equipo. Vacío se omite (regla de las
+  // claves omitidas) y el orden se normaliza, porque elegir A y después B o B y
+  // después A es el mismo filtro y no debe partir la caché en dos.
+  if (esAgente && etiquetas.length > 0) filtros.tagIds = [...etiquetas].sort();
+
+  // Recortado: "pdf" y "pdf " son la misma búsqueda y la misma clave.
+  const q = busqueda.trim();
+  if (q !== '') filtros.q = q;
+
   return filtros;
 }
 
@@ -57,3 +86,30 @@ export function filtrosDeBandeja({
 export function hayFiltros(filtros: FiltrosDeBandeja): boolean {
   return Object.keys(filtros).length > 0;
 }
+
+/**
+ * Qué decir cuando la bandeja vuelve vacía. La búsqueda gana a todo: si se
+ * buscó algo, decir "la bandeja está vacía" sería falso.
+ */
+export function mensajeBandejaVacia(filtros: FiltrosDeBandeja): string {
+  if (filtros.q !== undefined) return `Ningún ticket coincide con «${filtros.q}».`;
+  if (filtros.aiSuggestsHigher === true) {
+    return 'La IA no ve ningún ticket más urgente de lo que está marcado.';
+  }
+  if (filtros.tagIds !== undefined) return 'Ningún ticket con esas etiquetas.';
+  const porEstado = filtros.status !== undefined;
+  if (filtros.assigneeId !== undefined) {
+    return porEstado
+      ? 'No tenés ningún ticket asignado con ese estado.'
+      : 'No tenés ningún ticket asignado.';
+  }
+  if (filtros.requesterId !== undefined) {
+    return porEstado
+      ? 'No abriste ningún ticket con ese estado.'
+      : 'Todavía no abriste ningún ticket.';
+  }
+  return porEstado
+    ? 'Ningún ticket con ese estado.'
+    : 'La bandeja está vacía. Los tickets aparecen acá en cuanto alguien abre uno.';
+}
+

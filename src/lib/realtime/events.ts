@@ -50,6 +50,22 @@ export interface SlaBreachedMessage extends MensajeBase {
   assigneeId: string | null;
 }
 
+/** Solo llega a AGENT o ADMIN: la sugerencia de la IA es para el equipo. */
+export interface TicketTriagedMessage extends MensajeBase {
+  category: string;
+  suggestedPriority: string;
+  /** Opcionales: los eventos anteriores a este campo no los traen. */
+  number?: number;
+  /** Prioridad del ticket AL CLASIFICARLO, no necesariamente la de ahora. */
+  currentPriority?: string;
+}
+
+/** Cambiaron las etiquetas de un ticket (ADR-0031). Solo llega al equipo. */
+export interface TicketTagsChangedMessage extends MensajeBase {
+  added: string[];
+  removed: string[];
+}
+
 /** Mapa de nombre de evento a su payload. */
 export interface RealtimeEvents {
   'ticket.created': TicketCreatedMessage;
@@ -58,6 +74,8 @@ export interface RealtimeEvents {
   'ticket.assigned': TicketAssignmentMessage;
   'ticket.unassigned': TicketAssignmentMessage;
   'sla.breached': SlaBreachedMessage;
+  'ticket.triaged': TicketTriagedMessage;
+  'ticket.tags_changed': TicketTagsChangedMessage;
 }
 
 export type RealtimeEventName = keyof RealtimeEvents;

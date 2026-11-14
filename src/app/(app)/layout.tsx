@@ -1,22 +1,34 @@
 'use client';
 
 import {
+  CalendarClock,
   Inbox,
   LogOut,
   Menu,
+  MessageSquareText,
   Monitor,
   Moon,
   Sun,
+  Tags,
   Timer,
   X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { VistasEnNav } from '@/features/views/components/views-nav';
+import {
+  Fragment,
+  Suspense,
+  useEffect,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from 'react';
 import { Button } from '@/components/ui/button';
 import { Lozenge, Skeleton } from '@/components/ui/primitives';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useLogout, useSession } from '@/features/auth/session';
+import { AiTriageNotifier } from '@/features/tickets/components/ai-triage-notifier';
 import { useTema } from '@/providers/theme-provider';
 import { useWs } from '@/providers/ws-provider';
 import { cn } from '@/lib/utils';
@@ -69,6 +81,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
+      {/* Solo el equipo recibe ticket.triaged (sala staff); para un VIEWER esto no
+          escucha nada, pero ni se monta: la sugerencia no es asunto suyo. */}
+      {rol === 'AGENT' || rol === 'ADMIN' ? <AiTriageNotifier /> : null}
       <TopBar rol={rol} onAbrirMenu={() => setMenuAbierto(true)} />
 
       <div className="flex flex-1">
@@ -222,6 +237,14 @@ interface Destino {
 const DESTINOS: Destino[] = [
   { href: '/tickets', etiqueta: 'Tickets', icono: Inbox },
   { href: '/settings/sla', etiqueta: 'SLA', icono: Timer, soloAdmin: true },
+  { href: '/settings/horario', etiqueta: 'Horario', icono: CalendarClock, soloAdmin: true },
+  { href: '/settings/etiquetas', etiqueta: 'Etiquetas', icono: Tags, soloAdmin: true },
+  {
+    href: '/settings/respuestas',
+    etiqueta: 'Respuestas',
+    icono: MessageSquareText,
+    soloAdmin: true,
+  },
 ];
 
 function NavLateral({
@@ -235,6 +258,7 @@ function NavLateral({
 }) {
   const pathname = usePathname();
   const destinos = DESTINOS.filter((d) => !d.soloAdmin || rol === 'ADMIN');
+  const esEquipo = rol === 'AGENT' || rol === 'ADMIN';
 
   const enlaces = destinos.map((destino) => {
     // Se compara contra el primer segmento para que el detalle de un ticket
@@ -243,9 +267,8 @@ function NavLateral({
     const activo = pathname.startsWith(seccion);
     const Icono = destino.icono;
 
-    return (
+    const enlace = (
       <Link
-        key={destino.href}
         href={destino.href}
         aria-current={activo ? 'page' : undefined}
         onClick={onCerrar}
@@ -259,6 +282,20 @@ function NavLateral({
         <Icono className="size-4" />
         {destino.etiqueta}
       </Link>
+    );
+
+    // Las vistas guardadas cuelgan de "Tickets" (ADR-0033). Solo el equipo: a
+    // un VIEWER el backend le respondería 403. `Suspense` porque leen la URL.
+    const conVistas = destino.href === '/tickets' && esEquipo;
+    return (
+      <Fragment key={destino.href}>
+        {enlace}
+        {conVistas ? (
+          <Suspense fallback={null}>
+            <VistasEnNav onNavegar={onCerrar} />
+          </Suspense>
+        ) : null}
+      </Fragment>
     );
   });
 

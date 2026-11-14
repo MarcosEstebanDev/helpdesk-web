@@ -51,7 +51,134 @@ línea que el servidor). Node 24, pnpm 11.
 - Errores de la API en formato RFC 7807 (`application/problem+json`) con un
   `code` estable: mapear por `code`, no por el texto del mensaje.
 
-## Estado actual (2026-09-09)
+## Despliegue (2026-11-07)
+
+Plan gratis: este repo en **Vercel** (`app.<nombre>.is-a.dev`), la API en Render.
+`package.json` fija `packageManager: pnpm@11.13.1` y `engines.node: 24.x`; en
+Vercel hay que poner `ENABLE_EXPERIMENTAL_COREPACK=1` y `NEXT_PUBLIC_API_URL`
+(se inlinea en el build). El CI ya no le pasa `version` a `pnpm/action-setup`
+(falla si también hay `packageManager`). `output: "standalone"` se queda: lo
+usa el Dockerfile y Vercel lo ignora. Pasos en `helpdesk-api/docs/DEPLOY.md`.
+
+Nota vieja corregida: `feat/members-endpoint` del backend YA está en `dev` y en
+`main` (se mergeó el 2026-09-10); lo de "sin mergear" de más abajo es historia.
+
+## Horario laboral (2026-11-13, ADR-0034 del backend)
+
+Rama `feat/horario-laboral`. `features/business-hours/`: `api.ts`,
+`queries.ts` (`useBusinessHours` ADMIN, `useBusinessStatus` cada 5 min),
+`format.ts` (fechas en la zona de la ORGANIZACIÓN, con "hoy"/"mañana"),
+`week-form` (interruptor 24/7 que deshabilita sin borrar), `exceptions-list`
+(borrado confirmado en la fila; precarga de feriados del año actual y el
+siguiente) y `aviso-fuera-de-horario` (solo VIEWER: en "Abrir ticket" y sobre
+la caja de respuesta). `/settings/horario` solo ADMIN. La pantalla de SLA dice
+"horas hábiles" salvo en 24/7. La bandeja muestra la FECHA de vencimiento si
+falta más de un día (en la zona del navegador: no conoce la de la org).
+
+## UX de bandeja y detalle (2026-11-13, rama `feat/ux-bandeja-detalle`)
+
+Spec y plan en `helpdesk-api/docs/superpowers/`. Principio: **color solo para
+lo que pide atención** (prioridad alta/urgente, SLA por vencer/vencido,
+esperando al cliente); nada en MAYÚSCULAS.
+
+- **Bandeja** (`features/tickets/inbox/`): pestañas con número
+  (`GET /tickets/counts`, `ticketKeys.counts` cuelga de `lists()` así que toda
+  invalidación existente la alcanza; "Todos" suma los cinco estados; "Cerrados"
+  solo aparece si una vista filtra por él). Tabla = lista de enlaces con grilla
+  (un `<a>` no puede envolver un `<tr>`); VIEWER con 4 columnas. `j`/`k` mueven
+  el FOCO (Enter lo abre el navegador); se ignoran en campos, con modificadores
+  y dentro de diálogos. En móvil cada fila es una tarjeta.
+- **Detalle**: acciones de estado a la vista en la cabecera
+  (`status-actions-bar`), el panel empieza por el SLA (sin barra de progreso,
+  misma razón de siempre). Chat: cliente a la izquierda, equipo a la derecha,
+  nota interna al centro con candado; los cambios de estado se intercalan
+  (`features/tickets/detail/linea-de-tiempo.ts`, solo `ticket.status_changed`).
+- **Cambió una regla vieja:** el historial ya NO se pide solo al abrir su
+  pestaña — el chat del equipo lo necesita. Comparten clave: una sola petición.
+- **"Responder y esperar al cliente"**: comentario y DESPUÉS cambio de estado,
+  encadenados. Si el comentario falla, el estado no se toca; si falla el estado,
+  se avisa que la respuesta SÍ salió (reintentar la duplicaría). Solo staff, en
+  público, y si `ALLOWED_TRANSITIONS` permite la espera (desde OPEN no).
+- Gotcha de test: el `QueryClient` de los tests tiene `staleTime` 0 y el de la
+  app 60 s; para probar "una sola petición" usar `makeQueryClient()`.
+
+## Vistas guardadas (2026-11-13, ADR-0033 del backend)
+
+Rama `feat/vistas-guardadas` (entrega 3 de 3). Solo el equipo.
+
+- `features/views/`: `api.ts`, `queries.ts` (`useViews(habilitado)`),
+  `mapping.ts` (vista ↔ `EstadoDeBandeja`; `assignee: 'me'` = "Mis tickets",
+  lo vacío no se guarda, `mismoEstado` para saber si cambió algo),
+  `views-nav` (barra lateral, debajo de "Tickets") y `view-controls`
+  (Guardar / Actualizar / Borrar vista; "Compartir" solo ADMIN).
+- La bandeja lee `?vista=<id>` dentro de un `Suspense` y monta `Bandeja` con
+  `key` por vista: los filtros arrancan de la vista sin un efecto que
+  sincronice estado (la regla `react-hooks/set-state-in-effect` es error acá).
+  Vista inexistente → todos los tickets y un aviso.
+
+## Búsqueda (2026-11-13, ADR-0032 del backend)
+
+Rama `feat/busqueda` (entrega 2 de 3). Caja "Buscar… (o #123)" en la bandeja;
+`useDebounced` (`src/lib/use-debounced.ts`, 300 ms) para no pedir en cada
+tecla. `q` va RECORTADO en la clave de caché y se omite si está vacío. Para
+todos los roles: el backend decide qué comentarios cuentan (al cliente no le
+cuentan las notas internas). El backend devuelve como mucho las 1000
+coincidencias más recientes.
+
+## Etiquetas (2026-11-12, ADR-0031 del backend)
+
+Rama `feat/etiquetas-busqueda-vistas` (entrega 1 de 3: después búsqueda y
+vistas guardadas).
+
+- `features/tags/`: `api.ts`, `queries.ts` (`useTags(habilitado)`; renombrar o
+  borrar invalida `tagKeys.all` Y `ticketKeys.all`, porque el backend no
+  emite un evento por ticket), `tag-lozenge` (paleta de 8 → clases de
+  Tailwind con variante `dark:`; un color desconocido cae en gris),
+  `tag-editor` (detalle; autocompleta y ofrece "Crear «x»") y `tag-filter`
+  (bandeja; menú de casillas que no se cierra al marcar).
+- **Clasificación interna:** el VIEWER no recibe la clave `tags`; todo se
+  monta solo para el equipo y `filtrosDeBandeja` no manda `tagIds` a un
+  VIEWER. `tagIds` va ORDENADO en la clave de caché.
+- Historial: "Agregó la etiqueta X; quitó las etiquetas Y y Z", con el nombre
+  que tenía entonces.
+- `/settings/etiquetas` solo ADMIN (renombrar, color, borrar con aviso).
+
+## Respuestas predefinidas (2026-11-12, ADR-0030 del backend)
+
+Rama `feat/respuestas-predefinidas`.
+
+- `features/canned-responses/`: `api.ts`, `queries.ts` (`useCannedResponses(habilitado)`
+  — un VIEWER ni la pide, el backend le da 403), `fill.ts` y el selector.
+- **`fill.ts` repite la regla de variables del backend** (`template-variables.ts`).
+  Si cambia allí, cambia acá. Relleno en UNA pasada; email vacío o `null` deja
+  la variable literal.
+- Editor del ticket: botón "Respuestas" y `/` con el editor vacío; inserta en el
+  cursor. Con una variable sin rellenar, "Responder al cliente" pide "Enviar
+  igual" (estado del formulario, nunca `confirm()`); la nota interna no.
+- `/settings/respuestas` solo ADMIN (nav con `soloAdmin`). Borrar confirma en la
+  propia fila.
+- **Arreglado:** la sesión recuperada por refresh ahora toma `email` de
+  `/auth/me` (antes quedaba `''`).
+
+## Esperando al cliente (2026-11-12, ADR-0029 del backend)
+
+Rama `feat/esperando-al-cliente` (sale de `dev`, sin mergear ni pushear).
+
+- **`WAITING_ON_CUSTOMER`** en `lib/api/types.ts` (estado y `ALLOWED_TRANSITIONS`,
+  copia a mano de la tabla del backend). Lozenge **ámbar** (`warning`), no el
+  azul de En curso: la bandeja separa "lo trabajo" de "espera al cliente".
+- **`features/tickets/status-actions.ts`** (`accionesDesde`): el nombre de una
+  acción depende del ORIGEN — ir a `IN_PROGRESS` desde la espera es "Retomar",
+  no "Empezar" —, así que dejó de ser una tabla por destino en la página.
+- **Panel de SLA**: estado `paused` con el margen CONGELADO tal como llega y
+  "en pausa desde"; no se enseña "vence", porque la fecha se correrá lo que dure
+  la espera.
+- **Historial**: la vuelta automática (actor sistema, `trigger: 'customer_reply'`)
+  dice "El cliente respondió y el ticket volvió a curso".
+- Verificado: 103 tests, typecheck y lint. **Pendiente**: `pnpm build` y prueba
+  a mano contra la API.
+
+## Estado anterior (2026-09-09)
 
 **Fases 1, 2, 4, 6 y 7 (cliente) — CERRADAS.** El frontend ya se usa de punta a
 punta: entrar, abrir un ticket, conversarlo, operarlo como agente y configurar el

@@ -16,11 +16,62 @@ export const ticketKeys = {
   lists: () => [...ticketKeys.all, 'list'] as const,
   list: (filtros: Record<string, unknown> = {}) =>
     [...ticketKeys.lists(), filtros] as const,
+  /** Conteos por estado de las pestañas. Cuelga de `lists()` a propósito: todo
+   *  lo que refresca la bandeja (realtime, mutaciones) refresca los números. */
+  counts: (filtros: Record<string, unknown> = {}) =>
+    [...ticketKeys.lists(), 'counts', filtros] as const,
   details: () => [...ticketKeys.all, 'detail'] as const,
   detail: (ticketId: string) => [...ticketKeys.details(), ticketId] as const,
   /** Rastro de auditoría de un ticket (`GET /tickets/:id/history`). */
   history: (ticketId: string) =>
     [...ticketKeys.detail(ticketId), 'history'] as const,
+  /** Sugerencia de la IA (`GET /tickets/:id/triage`). Cuelga del detalle a
+   *  proposito: todo lo que ya invalida el detalle la alcanza. */
+  triage: (ticketId: string) =>
+    [...ticketKeys.detail(ticketId), 'triage'] as const,
+};
+
+/**
+ * Claves de MUTACIÓN (no de caché). Todo lo que cambia el estado de un ticket
+ * comparte la suya, para que `useIsMutating` deje saber desde cualquier
+ * componente que hay un cambio en vuelo y no se mande otro encima (un 409).
+ */
+export const ticketMutationKeys = {
+  cambioDeEstado: (ticketId: string) =>
+    ['tickets', ticketId, 'cambio-de-estado'] as const,
+};
+
+/**
+ * Catálogo de etiquetas (`GET /tags`, AGENT o superior). Renombrar o borrar
+ * una etiqueta cambia también cómo se pintan los tickets: quien la cambia
+ * invalida esto Y `ticketKeys.all`.
+ */
+export const tagKeys = {
+  all: ['tags'] as const,
+};
+
+/**
+ * Respuestas predefinidas (`GET /canned-responses`, AGENT o superior). Las
+ * invalida su propia pantalla de configuración al guardar: el backend no emite
+ * ningún evento por ellas.
+ */
+export const cannedResponseKeys = {
+  all: ['canned-responses'] as const,
+};
+
+/** Vistas guardadas (`GET /views`, AGENT o superior). Las invalida quien las guarda. */
+export const viewKeys = {
+  all: ['views'] as const,
+};
+
+/**
+ * Horario laboral (ADR-0034 del backend). `config` es del ADMIN; `status` lo
+ * pide el cliente para el aviso de fuera de horario. Los invalida quien guarda.
+ */
+export const businessHoursKeys = {
+  all: ['business-hours'] as const,
+  config: ['business-hours', 'config'] as const,
+  status: ['business-hours', 'status'] as const,
 };
 
 /** Configuración de SLA de la organización (`GET /sla-policy`, solo ADMIN). */

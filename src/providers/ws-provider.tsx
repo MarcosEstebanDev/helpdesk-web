@@ -18,6 +18,8 @@ import type {
   CommentAddedMessage,
   DisconnectedMessage,
   SlaBreachedMessage,
+  TicketTagsChangedMessage,
+  TicketTriagedMessage,
   TicketAssignmentMessage,
   TicketCreatedMessage,
   TicketStatusChangedMessage,
@@ -41,12 +43,19 @@ type WsContextValue = {
    * a la invalidación: los datos siguen viniendo de la API.
    */
   cambiosRecientes: Record<string, number>;
+  /**
+   * Avisa cada vez que la IA clasifica un ticket. Devuelve la función para
+   * darse de baja. Existe para que QUIEN PINTA (el aviso en pantalla) no viva
+   * aquí: este provider solo invalida caché.
+   */
+  alClasificar: (oyente: (msg: TicketTriagedMessage) => void) => () => void;
 };
 
 const WsContext = createContext<WsContextValue>({
   connected: false,
   watchTicket: () => () => {},
   cambiosRecientes: {},
+  alClasificar: () => () => {},
 });
 
 /**
@@ -77,6 +86,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<Socket | null>(null);
   /** Tickets seguidos, con cuántos componentes los están mirando. */
   const watched = useRef(new Map<string, number>());
+  const oyentesDeIa = useRef(new Set<(msg: TicketTriagedMessage) => void>());
 
   /**
    * Anota qué ticket acaba de cambiar, para que la lista pueda señalarlo.
@@ -156,10 +166,12 @@ export function WsProvider({ children }: { children: ReactNode }) {
     });
 
     socket.on('comment.added', (msg: CommentAddedMessage) => {
-      // Solo el detalle: un comentario no cambia nada de lo que se ve en la lista.
+      // El detalle, y también las listas: desde UX 2026-11-13 la fila muestra
+      // el SLA que más apura, y la primera respuesta del equipo lo cambia.
       void queryClient.invalidateQueries({
         queryKey: ticketKeys.detail(msg.ticketId),
       });
+      void queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
     });
 
     // `ticket.assigned` / `ticket.unassigned` / `sla.breached` solo llegan a
@@ -174,6 +186,34 @@ export function WsProvider({ children }: { children: ReactNode }) {
     socket.on('sla.breached', (msg: SlaBreachedMessage) => {
       void queryClient.invalidateQueries({ queryKey: ticketKeys.all });
       anotarCambio(msg.ticketId);
+    });
+
+    // Etiquetas (ADR-0031): cambian lo que se ve en el detalle y en cada fila
+    // de la bandeja (y el resultado de un filtro por etiqueta). Solo llega al
+    // equipo: el backend no lo manda a la sala general.
+    socket.on('ticket.tags_changed', (msg: TicketTagsChangedMessage) => {
+      // `exact`: por prefijo también volvería a pedir la sugerencia de la IA,
+      // que no cambia por etiquetar. El historial sí (tiene una entrada nueva).
+      void queryClient.invalidateQueries({
+        queryKey: ticketKeys.detail(msg.ticketId),
+        exact: true,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ticketKeys.history(msg.ticketId),
+      });
+      void queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
+      anotarCambio(msg.ticketId);
+    });
+
+    // La tarjeta del detalle y la bandeja (que pinta la sugerencia en cada
+    // fila). El detalle del ticket NO: la sugerencia no cambia nada de él.
+    socket.on('ticket.triaged', (msg: TicketTriagedMessage) => {
+      void queryClient.invalidateQueries({
+        queryKey: ticketKeys.triage(msg.ticketId),
+      });
+      void queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
+      anotarCambio(msg.ticketId);
+      for (const oyente of oyentesDeIa.current) oyente(msg);
     });
 
     return () => {
@@ -208,9 +248,19 @@ export function WsProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const alClasificar = useCallback(
+    (oyente: (msg: TicketTriagedMessage) => void) => {
+      oyentesDeIa.current.add(oyente);
+      return () => {
+        oyentesDeIa.current.delete(oyente);
+      };
+    },
+    [],
+  );
+
   const value = useMemo(
-    () => ({ connected, watchTicket, cambiosRecientes }),
-    [connected, watchTicket, cambiosRecientes],
+    () => ({ connected, watchTicket, cambiosRecientes, alClasificar }),
+    [connected, watchTicket, cambiosRecientes, alClasificar],
   );
 
   return <WsContext.Provider value={value}>{children}</WsContext.Provider>;

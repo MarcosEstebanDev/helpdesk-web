@@ -43,6 +43,15 @@ describe('papelDelActor', () => {
 });
 
 describe('describirEntrada', () => {
+  it('una nota interna se distingue de un comentario (y lo viejo, sin visibilidad, era público)', () => {
+    const frase = (metadata: AuditEntry['metadata']) =>
+      describirEntrada(entrada({ action: 'comment.added', metadata }), PARTICIPANTES).frase;
+
+    expect(frase({ commentId: 'c1', visibility: 'INTERNAL' })).toBe('Dejó una nota interna');
+    expect(frase({ commentId: 'c1', visibility: 'PUBLIC' })).toBe('Comentó');
+    expect(frase({ commentId: 'c1' })).toBe('Comentó');
+  });
+
   it('un cambio de estado con from y to se lee como una transición', () => {
     const d = describirEntrada(
       entrada({
@@ -53,6 +62,30 @@ describe('describirEntrada', () => {
     );
 
     expect(d.transicion).toEqual({ desde: 'OPEN', hasta: 'IN_PROGRESS' });
+  });
+
+  it('la vuelta automática desde la espera dice por qué ocurrió (ADR-0029)', () => {
+    const d = describirEntrada(
+      entrada({
+        action: 'ticket.status_changed',
+        actorId: SYSTEM_ACTOR_ID,
+        metadata: {
+          from: 'WAITING_ON_CUSTOMER',
+          to: 'IN_PROGRESS',
+          automatic: true,
+          trigger: 'customer_reply',
+        },
+      }),
+      PARTICIPANTES,
+    );
+
+    expect(d.papel).toBe('sistema');
+    expect(d.frase).toBe('El cliente respondió y el ticket volvió a curso');
+    expect(d.automatico).toBe(true);
+    expect(d.transicion).toEqual({
+      desde: 'WAITING_ON_CUSTOMER',
+      hasta: 'IN_PROGRESS',
+    });
   });
 
   // El caso que justifica todo el archivo: `metadata` es `unknown` y puede
@@ -170,5 +203,43 @@ describe('describirEntrada', () => {
 
     expect(buena.prioridad).toBe('HIGH');
     expect(mala.prioridad).toBeUndefined();
+  });
+});
+
+describe('describirEntrada: etiquetas (ADR-0031)', () => {
+  const tags = (added: string[], removed: string[]) =>
+    entrada({
+      action: 'ticket.tags_changed',
+      metadata: {
+        added: added.map((name, i) => ({ id: `a${i}`, name })),
+        removed: removed.map((name, i) => ({ id: `r${i}`, name })),
+      },
+    });
+
+  it('una agregada', () => {
+    expect(describirEntrada(tags(['bug'], []), PARTICIPANTES).frase).toBe(
+      'Agregó la etiqueta bug',
+    );
+  });
+
+  it('varias quitadas', () => {
+    expect(describirEntrada(tags([], ['bug', 'vip']), PARTICIPANTES).frase).toBe(
+      'Quitó las etiquetas bug y vip',
+    );
+  });
+
+  it('agregadas y quitadas a la vez', () => {
+    expect(
+      describirEntrada(tags(['vip', 'pago', 'web'], ['bug']), PARTICIPANTES).frase,
+    ).toBe('Agregó las etiquetas vip, pago y web; quitó la etiqueta bug');
+  });
+
+  it('sin metadata legible no inventa nombres', () => {
+    expect(
+      describirEntrada(
+        entrada({ action: 'ticket.tags_changed', metadata: null }),
+        PARTICIPANTES,
+      ).frase,
+    ).toBe('Cambió las etiquetas');
   });
 });

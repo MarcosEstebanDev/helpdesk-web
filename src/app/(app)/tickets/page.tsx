@@ -1,8 +1,8 @@
 'use client';
 
-import { Inbox, Plus, UserCheck } from 'lucide-react';
-import Link from 'next/link';
-import { useState, type FormEvent } from 'react';
+import { Inbox, Plus, Search, Sparkles, UserCheck } from 'lucide-react';
+import { Suspense, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import {
@@ -10,42 +10,48 @@ import {
   ErrorText,
   Input,
   Label,
-  Lozenge,
   Select,
   Skeleton,
   Textarea,
 } from '@/components/ui/primitives';
-import { Tooltip } from '@/components/ui/tooltip';
 import { useAvisos } from '@/components/ui/toast';
 import { useSession } from '@/features/auth/session';
-import {
-  FechaRelativa,
-  PriorityBadge,
-  StatusBadge,
-} from '@/features/tickets/components/ticket-badges';
+import { AvisoFueraDeHorario } from '@/features/business-hours/components/aviso-fuera-de-horario';
+import { crearDirectorio } from '@/features/members/directory';
+import { useMembers } from '@/features/members/queries';
 import {
   filtrosDeBandeja,
   hayFiltros,
+  mensajeBandejaVacia,
   type FiltrosDeBandeja,
 } from '@/features/tickets/filters';
-import { useCreateTicket, useTickets } from '@/features/tickets/queries';
+import { PestanasDeEstado } from '@/features/tickets/inbox/pestanas-de-estado';
+import {
+  TablaDeTickets,
+  TablaEsqueleto,
+} from '@/features/tickets/inbox/tabla-de-tickets';
+import { TagFilter } from '@/features/tags/components/tag-filter';
+import { ControlesDeVista } from '@/features/views/components/view-controls';
+import {
+  type EstadoDeBandeja,
+  filtrosDeVistaAEstado,
+} from '@/features/views/mapping';
+import { useViews } from '@/features/views/queries';
+import { resolverVista } from '@/features/views/resolve';
+import {
+  useCreateTicket,
+  useTicketCounts,
+  useTickets,
+} from '@/features/tickets/queries';
 import { ApiError } from '@/lib/api/client';
-import { useWs } from '@/providers/ws-provider';
+import { useDebounced } from '@/lib/use-debounced';
 import { cn } from '@/lib/utils';
 import {
   TICKET_PRIORITIES,
-  TICKET_STATUSES,
   type TicketPriority,
   type TicketStatus,
-  type TicketSummary,
+  type SavedView,
 } from '@/lib/api/types';
-
-const ESTADO_TEXTO: Record<TicketStatus, string> = {
-  OPEN: 'Abiertos',
-  IN_PROGRESS: 'En curso',
-  RESOLVED: 'Resueltos',
-  CLOSED: 'Cerrados',
-};
 
 const PRIORIDAD_TEXTO: Record<TicketPriority, string> = {
   LOW: 'Baja',
@@ -59,12 +65,70 @@ const PRIORIDAD_TEXTO: Record<TicketPriority, string> = {
  *
  * Se actualiza sola: el `WsProvider` invalida `ticketKeys.lists()` cuando llega
  * un `ticket.created` o un cambio de estado, así que no hace falta refrescar ni
- * hay ningún `setInterval` sondeando el servidor.
+ * hay ningún `setInterval` sondeando el servidor. Los números de las pestañas
+ * cuelgan de la misma clave y se refrescan con ella.
+ *
+ * Teclado: `j`/`k` recorren las filas y Enter abre la enfocada.
  */
 export default function TicketsPage() {
+  // `useSearchParams` exige un `Suspense` por encima para que Next pueda
+  // prerenderizar el resto de la página.
+  return (
+    <Suspense fallback={<Skeleton className="h-64 w-full rounded-lg" />}>
+      <BandejaConVista />
+    </Suspense>
+  );
+}
+
+/**
+ * Lee `?vista=` y monta la bandeja con esos filtros (ADR-0033 del backend).
+ * La `key` por vista vuelve a montar la bandeja al cambiar de vista: así sus
+ * filtros arrancan de la vista sin sincronizar estado con un efecto.
+ */
+function BandejaConVista() {
   const { user } = useSession();
-  const [estado, setEstado] = useState<TicketStatus | ''>('');
-  const [soloMios, setSoloMios] = useState(false);
+  const esEquipo = user?.role === 'AGENT' || user?.role === 'ADMIN';
+  const vistaId = useSearchParams().get('vista');
+  const vistas = useViews(esEquipo && vistaId !== null);
+  const resuelta = resolverVista(vistaId, esEquipo, vistas);
+
+  if (resuelta.tipo === 'cargando') {
+    return <Skeleton className="h-64 w-full rounded-lg" />;
+  }
+  return (
+    <Bandeja
+      key={resuelta.key}
+      vista={resuelta.vista}
+      aviso={
+        resuelta.tipo === 'perdida'
+          ? 'Esa vista ya no existe. Se muestran todos los tickets.'
+          : resuelta.tipo === 'error'
+            ? 'No se pudo cargar la vista. Se muestran todos los tickets.'
+            : null
+      }
+    />
+  );
+}
+
+function Bandeja({
+  vista,
+  aviso,
+}: {
+  vista: SavedView | null;
+  /** Por qué no se aplicó la vista pedida (no existe o no se pudo cargar). */
+  aviso: string | null;
+}) {
+  const { user } = useSession();
+  const inicial = vista === null ? null : filtrosDeVistaAEstado(vista.filters);
+  const [estado, setEstado] = useState<TicketStatus | ''>(inicial?.estado ?? '');
+  const [soloMios, setSoloMios] = useState(inicial?.soloMios ?? false);
+  const [soloIaUrgentes, setSoloIaUrgentes] = useState(
+    inicial?.soloIaUrgentes ?? false,
+  );
+  const [etiquetas, setEtiquetas] = useState<string[]>(inicial?.etiquetas ?? []);
+  const [texto, setTexto] = useState(inicial?.texto ?? '');
+  // La búsqueda viaja recién cuando se deja de escribir (ADR-0032).
+  const busqueda = useDebounced(texto, 300);
   const [abriendo, setAbriendo] = useState(false);
 
   // El filtro existe para los tres roles, pero NO significa lo mismo: un agente
@@ -79,7 +143,17 @@ export default function TicketsPage() {
     soloMios,
     miId: user?.id,
     esAgente,
+    soloIaUrgentes,
+    etiquetas,
+    busqueda,
   });
+  const estadoActual: EstadoDeBandeja = {
+    estado,
+    soloMios,
+    soloIaUrgentes,
+    etiquetas,
+    texto,
+  };
 
   const {
     data,
@@ -92,28 +166,46 @@ export default function TicketsPage() {
   } = useTickets(filtros);
 
   const tickets = data?.pages.flatMap((p) => p.items) ?? [];
+  const conteos = useTicketCounts(filtros);
+  // Las iniciales del asignado salen del directorio. Solo el equipo lo puede
+  // pedir (ADR-0025); comparte clave con el selector de asignación.
+  const miembros = useMembers(esAgente);
+  const directorio = crearDirectorio(miembros.data?.items);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold tracking-tight">Tickets</h1>
+        <h1 className="text-xl font-semibold tracking-tight">
+          {vista?.name ?? 'Tickets'}
+        </h1>
+        <Button className="ml-auto" onClick={() => setAbriendo(true)}>
+          <Plus />
+          Abrir ticket
+        </Button>
+      </div>
 
-        <Select
-          aria-label="Filtrar por estado"
-          value={estado}
-          onChange={(e) => setEstado(e.target.value as TicketStatus | '')}
-        >
-          <option value="">Todos los estados</option>
-          {TICKET_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {ESTADO_TEXTO[s]}
-            </option>
-          ))}
-        </Select>
+      <PestanasDeEstado
+        actual={estado}
+        counts={conteos.data}
+        onChange={setEstado}
+      />
 
-        {/* Botón conmutador y no una opción más del desplegable de estado: son
-            dos dimensiones ortogonales, y el filtro real de un agente es "mis
-            tickets en curso", que un solo `select` no deja expresar. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-72">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            placeholder="Buscar… (o #123)"
+            aria-label="Buscar tickets"
+            maxLength={200}
+            className="pl-8"
+          />
+        </div>
+
+        {/* Conmutador y no una pestaña más: son dos dimensiones ortogonales, y
+            el filtro real de un agente es "mis tickets en curso". */}
         <Button
           variant="outline"
           aria-pressed={soloMios}
@@ -126,11 +218,42 @@ export default function TicketsPage() {
           {esAgente ? 'Mis tickets' : 'Los que abrí yo'}
         </Button>
 
-        <Button className="ml-auto" onClick={() => setAbriendo(true)}>
-          <Plus />
-          Abrir ticket
-        </Button>
+        {esAgente ? (
+          <TagFilter seleccion={etiquetas} onChange={setEtiquetas} />
+        ) : null}
+
+        {/* El valor real del triage para un agente: encontrar el incendio que
+            entró como "normal". Solo existe para el equipo (ADR-0027). */}
+        {esAgente ? (
+          <Button
+            variant="outline"
+            aria-pressed={soloIaUrgentes}
+            onClick={() => setSoloIaUrgentes((v) => !v)}
+            className={cn(
+              soloIaUrgentes && 'border-primary bg-accent text-accent-foreground',
+            )}
+          >
+            <Sparkles />
+            La IA sugiere más urgencia
+          </Button>
+        ) : null}
+
+        {esAgente ? (
+          <div className="ml-auto">
+            <ControlesDeVista
+              vista={vista}
+              estado={estadoActual}
+              esAdmin={user?.role === 'ADMIN'}
+            />
+          </div>
+        ) : null}
       </div>
+
+      {aviso !== null ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          {aviso}
+        </p>
+      ) : null}
 
       <Dialog
         abierto={abriendo}
@@ -142,7 +265,7 @@ export default function TicketsPage() {
       </Dialog>
 
       {isPending ? (
-        <ListaEsqueleto />
+        <TablaEsqueleto esEquipo={esAgente} />
       ) : isError ? (
         <Card className="p-4">
           <ErrorText>
@@ -155,17 +278,23 @@ export default function TicketsPage() {
         <BandejaVacia
           filtros={filtros}
           onVerTodos={() => {
+            // "Ver todos" quita TODO lo que filtra: antes la búsqueda y las
+            // etiquetas quedaban puestas y el botón parecía no hacer nada.
             setEstado('');
             setSoloMios(false);
+            setSoloIaUrgentes(false);
+            setEtiquetas([]);
+            setTexto('');
           }}
           onAbrir={() => setAbriendo(true)}
         />
       ) : (
-        <Card className="divide-y divide-border overflow-hidden">
-          {tickets.map((ticket) => (
-            <Fila key={ticket.id} ticket={ticket} />
-          ))}
-        </Card>
+        <TablaDeTickets
+          tickets={tickets}
+          esEquipo={esAgente}
+          miId={user?.id}
+          directorio={directorio}
+        />
       )}
 
       {hasNextPage ? (
@@ -180,104 +309,6 @@ export default function TicketsPage() {
         </div>
       ) : null}
     </div>
-  );
-}
-
-/**
- * Una fila de la bandeja.
- *
- * En pantalla ancha es una línea de 40px que se recorre en vertical; por debajo
- * de `sm` los metadatos bajan a una segunda línea en vez de comprimir el asunto,
- * que es el único dato por el que alguien busca un ticket.
- */
-function Fila({ ticket }: { ticket: TicketSummary }) {
-  const { user } = useSession();
-  const { cambiosRecientes } = useWs();
-
-  // Que la fila haya cambiado por un aviso del servidor mientras la pantalla
-  // estaba abierta. Se señala una vez y se apaga sola: es un cambio que ocurrió
-  // donde el usuario no estaba mirando.
-  const recienCambiado = cambiosRecientes[ticket.id] !== undefined;
-
-  return (
-    <Link
-      href={`/tickets/${ticket.id}`}
-      className={cn(
-        'flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2.5 transition-colors',
-        'hover:bg-muted/60 focus-visible:bg-muted/60',
-        recienCambiado && 'animate-destello',
-      )}
-    >
-      <PriorityBadge priority={ticket.priority} />
-
-      <span className="shrink-0 font-mono text-xs text-muted-foreground">
-        #{ticket.number}
-      </span>
-
-      <span className="min-w-0 flex-1 truncate text-sm font-medium">
-        {ticket.subject}
-      </span>
-
-      <span className="flex shrink-0 items-center gap-3 max-sm:w-full max-sm:pl-7">
-        <Asignacion ticket={ticket} miId={user?.id} />
-        <StatusBadge status={ticket.status} />
-        <span className="w-14 shrink-0 text-right text-xs text-muted-foreground">
-          <FechaRelativa iso={ticket.updatedAt} />
-        </span>
-      </span>
-    </Link>
-  );
-}
-
-/**
- * Quién lo tiene.
- *
- * El backend no expone un endpoint de miembros, así que de un asignado solo se
- * conoce el UUID. Lo único que se puede decir con honestidad —y lo único que un
- * agente necesita para decidir— es si le toca a él.
- */
-function Asignacion({
-  ticket,
-  miId,
-}: {
-  ticket: TicketSummary;
-  miId: string | undefined;
-}) {
-  if (ticket.assigneeId === null) {
-    return (
-      <Tooltip contenido="Sin asignar">
-        <span className="text-xs text-muted-foreground">Libre</span>
-      </Tooltip>
-    );
-  }
-
-  if (ticket.assigneeId === miId) {
-    return <Lozenge tone="info">Tuyo</Lozenge>;
-  }
-
-  return (
-    <Tooltip contenido="Asignado a otro agente">
-      <span className="text-xs text-muted-foreground">Asignado</span>
-    </Tooltip>
-  );
-}
-
-function ListaEsqueleto() {
-  return (
-    <Card className="divide-y divide-border overflow-hidden">
-      {[0, 1, 2, 3, 4].map((fila) => (
-        <div key={fila} className="flex items-center gap-3 px-3 py-2.5">
-          <Skeleton className="size-4 rounded-full" />
-          <Skeleton className="h-3 w-8" />
-          <Skeleton className="h-3 flex-1 max-w-80" />
-          <Skeleton className="ml-auto h-4 w-16" />
-          <Skeleton className="h-3 w-12" />
-        </div>
-      ))}
-      <span className="sr-only" role="status">
-        Cargando los tickets
-      </span>
-    </Card>
   );
 }
 
@@ -298,21 +329,7 @@ function BandejaVacia({
   onAbrir: () => void;
 }) {
   const filtrada = hayFiltros(filtros);
-  const porAsignacion = filtros.assigneeId !== undefined;
-  const porAutoria = filtros.requesterId !== undefined;
-  const porEstado = filtros.status !== undefined;
-
-  const mensaje = porAsignacion
-    ? porEstado
-      ? 'No tenés ningún ticket asignado con ese estado.'
-      : 'No tenés ningún ticket asignado.'
-    : porAutoria
-      ? porEstado
-        ? 'No abriste ningún ticket con ese estado.'
-        : 'Todavía no abriste ningún ticket.'
-      : porEstado
-        ? 'Ningún ticket con ese estado.'
-        : 'La bandeja está vacía. Los tickets aparecen acá en cuanto alguien abre uno.';
+  const mensaje = mensajeBandejaVacia(filtros);
 
   return (
     <Card className="flex flex-col items-center gap-3 px-6 py-12 text-center">
@@ -338,6 +355,7 @@ function NuevoTicket({ onListo }: { onListo: () => void }) {
   const [priority, setPriority] = useState<TicketPriority>('NORMAL');
   const avisos = useAvisos();
   const crear = useCreateTicket();
+  const { user } = useSession();
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -354,6 +372,10 @@ function NuevoTicket({ onListo }: { onListo: () => void }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {/* Fuera de horario el cliente puede abrirlo igual: queda en cola y
+          sabe cuándo lo van a ver (ADR-0034). */}
+      <AvisoFueraDeHorario esCliente={user?.role === 'VIEWER'} />
+
       <div className="space-y-1.5">
         <Label htmlFor="subject">Asunto</Label>
         <Input

@@ -28,6 +28,7 @@ function Estado() {
     <>
       <span data-testid="status">{status}</span>
       <span data-testid="role">{user?.role ?? '-'}</span>
+      <span data-testid="email">{user?.email || '-'}</span>
     </>
   );
 }
@@ -132,5 +133,26 @@ describe('el estado se deriva del store', () => {
     });
 
     expect(screen.getByTestId('status')).toHaveTextContent('anonymous');
+  });
+});
+
+describe('email tras recuperar la sesión (ADR-0030)', () => {
+  it('lo toma de /auth/me: sin él, {{agente.email}} no se rellena', async () => {
+    refrescar.mockImplementation(async () => {
+      useAuthStore.getState().setAccessToken('token-recuperado');
+      return 'token-recuperado';
+    });
+    perfil.mockResolvedValue({
+      userId: 'u-1',
+      tenantId: 't-1',
+      role: 'AGENT',
+      email: 'agente@acme.test',
+    });
+
+    montar();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('email')).toHaveTextContent('agente@acme.test'),
+    );
   });
 });

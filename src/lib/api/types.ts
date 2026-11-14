@@ -12,6 +12,7 @@
 export const TICKET_STATUSES = [
   'OPEN',
   'IN_PROGRESS',
+  'WAITING_ON_CUSTOMER',
   'RESOLVED',
   'CLOSED',
 ] as const;
@@ -25,12 +26,14 @@ export type Role = 'ADMIN' | 'AGENT' | 'VIEWER';
 /**
  * Transiciones legales (ADR-0015 del backend). Se replican para no ofrecer
  * botones que van a devolver 409, pero **el backend sigue siendo la autoridad**:
- * esto es UX, no validación.
+ * esto es UX, no validación. Es una copia a mano de la tabla del backend: al
+ * sumar un estado allí (WAITING_ON_CUSTOMER, ADR-0029) hay que sumarlo aquí.
  */
 export const ALLOWED_TRANSITIONS: Record<TicketStatus, readonly TicketStatus[]> =
   {
     OPEN: ['IN_PROGRESS', 'RESOLVED'],
-    IN_PROGRESS: ['RESOLVED', 'OPEN'],
+    IN_PROGRESS: ['RESOLVED', 'OPEN', 'WAITING_ON_CUSTOMER'],
+    WAITING_ON_CUSTOMER: ['IN_PROGRESS', 'RESOLVED'],
     RESOLVED: ['CLOSED', 'OPEN'],
     CLOSED: [],
   };
@@ -73,6 +76,82 @@ export interface MemberList {
   items: Member[];
 }
 
+// --------------------------------------------------------------- etiquetas
+
+/** Paleta cerrada del backend (ADR-0031). Los tonos los decide `tag-lozenge`. */
+export const TAG_COLORS = [
+  'gray',
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'teal',
+  'blue',
+  'purple',
+] as const;
+export type TagColor = (typeof TAG_COLORS)[number];
+
+/** Etiqueta del catálogo. Clasificación INTERNA: solo la ve el equipo. */
+export interface Tag {
+  id: string;
+  name: string;
+  color: TagColor;
+}
+
+export interface TagList {
+  items: Tag[];
+}
+
+// ---------------------------------------------------------- vistas guardadas
+
+/** Filtros de una vista, versión 1 (ADR-0033 del backend). Lo vacío se omite. */
+export interface ViewFilters {
+  version: 1;
+  status?: TicketStatus;
+  /** "Asignados a mí": cada uno ve lo suyo. */
+  assignee?: 'me';
+  tagIds?: string[];
+  q?: string;
+  aiSuggestsHigher?: true;
+}
+
+/** Vista guardada. `shared` = la ve todo el equipo (solo un ADMIN la cambia). */
+export interface SavedView {
+  id: string;
+  name: string;
+  shared: boolean;
+  filters: ViewFilters;
+  updatedAt: string;
+}
+
+export interface SavedViewList {
+  items: SavedView[];
+}
+
+// ------------------------------------------------- respuestas predefinidas
+
+/**
+ * Respuesta predefinida de la organización (ADR-0030 del backend). La lee el
+ * equipo (AGENT o superior) y la escribe el ADMIN. Las variables las rellena el
+ * front al insertarla (`features/canned-responses/fill.ts`).
+ */
+export interface CannedResponse {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CannedResponseList {
+  items: CannedResponse[];
+}
+
+export interface CannedResponseInput {
+  title: string;
+  body: string;
+}
+
 // ---------------------------------------------------------------- tickets
 
 export interface TicketSummary {
@@ -86,23 +165,61 @@ export interface TicketSummary {
   assigneeId: string | null;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Solo en la BANDEJA y solo para AGENT o superior. Tres significados: la
+   * clave no está (VIEWER, o el detalle), `null` (sin sugerencia todavía) o la
+   * sugerencia. No confundir los dos primeros.
+   */
+  aiTriage?: { category: string; suggestedPriority: TicketPriority } | null;
+  /**
+   * Etiquetas (ADR-0031 del backend). Solo llegan al equipo: para un VIEWER la
+   * clave no existe, no viene vacía.
+   */
+  tags?: Tag[];
+  /** Solo en la BANDEJA y solo para AGENT o superior: quién abrió el ticket. */
+  requesterEmail?: string;
+  /** Solo en la BANDEJA y solo para AGENT o superior: el reloj que más apura. */
+  slaSummary?: SlaSummary;
 }
+
+/**
+ * Resumen del SLA para una fila de la bandeja (`summarizeSla` del backend).
+ * Un ticket resuelto o cerrado viene como `none` aunque algún reloj se haya
+ * incumplido: en la bandeja ya no pide atención.
+ */
+export type SlaSummary =
+  | { state: 'none' }
+  | { state: 'paused' }
+  | { state: 'running'; dueAt: string }
+  | { state: 'breached'; since: string };
+
+/** `GET /tickets/counts`: mismos filtros que el listado salvo el estado. */
+export type TicketCounts = Record<TicketStatus, number>;
+
+/**
+ * `INTERNAL` es una nota del equipo (ADR-0028 del backend): el cliente no la
+ * ve —el backend ni siquiera se la manda— y no cuenta como respuesta del SLA.
+ */
+export type CommentVisibility = 'PUBLIC' | 'INTERNAL';
 
 export interface TicketComment {
   id: string;
   authorId: string;
   body: string;
+  visibility: CommentVisibility;
   createdAt: string;
 }
 
 export type SlaKind = 'RESPONSE' | 'RESOLUTION';
-export type SlaStatus = 'running' | 'met' | 'breached';
+export type SlaStatus = 'running' | 'paused' | 'met' | 'breached';
 
 export interface TicketSla {
   kind: SlaKind;
   dueAt: string;
   stoppedAt: string | null;
   breachedAt: string | null;
+  /** Desde cuándo está en pausa (el ticket espera al cliente). */
+  pausedAt: string | null;
   status: SlaStatus;
   /** Negativo si se pasó del objetivo. */
   remainingMinutes: number;
@@ -142,6 +259,8 @@ export const AUDIT_ACTIONS = [
   'comment.added',
   'sla.breached',
   'sla.policy_changed',
+  'ticket.tags_changed',
+  'business_hours.changed',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -167,6 +286,46 @@ export interface AuditEntry {
 
 // -------------------------------------------------------------------- SLA
 
+/**
+ * Horario laboral de la organización (ADR-0034 del backend). Sin configurar
+ * rige L–V 08:00–18:00 en Argentina (`source: 'default'`). En `24_7` el SLA
+ * cuenta horas de reloj; la semana se conserva para cuando se vuelva.
+ */
+export type BusinessHoursMode = 'business_hours' | '24_7';
+
+/** Una fecha (LOCAL de la organización) que pisa la semana tipo. */
+export interface CalendarException {
+  id: string;
+  /** `YYYY-MM-DD`. */
+  date: string;
+  /** `false` = no hábil (feriado); `true` = día hábil extra. */
+  working: boolean;
+  name: string;
+}
+
+export interface BusinessHoursInput {
+  mode: BusinessHoursMode;
+  timeZone: string;
+  /** 1 = lunes … 7 = domingo. */
+  weekdays: number[];
+  /** `HH:MM`. */
+  opensAt: string;
+  closesAt: string;
+}
+
+export interface BusinessHours extends BusinessHoursInput {
+  source: 'default' | 'organization';
+  exceptions: CalendarException[];
+}
+
+/** Lo único del horario que ve el cliente (`GET /business-hours/status`). */
+export interface BusinessStatus {
+  open: boolean;
+  /** `null` si está abierto ahora. */
+  nextOpening: string | null;
+  timeZone: string;
+}
+
 export interface EffectiveSlaTarget {
   priority: TicketPriority;
   responseMinutes: number;
@@ -174,3 +333,29 @@ export interface EffectiveSlaTarget {
   /** `default` = el valor de fábrica; `organization` = pactado por el tenant. */
   source: 'default' | 'organization';
 }
+
+/**
+ * Sugerencia de la IA para un ticket (`GET /tickets/:id/triage`, ADR-0027).
+ *
+ * Es una SUGERENCIA: nunca cambia la prioridad real del ticket. `pending`
+ * significa que la cola todavia no la proceso; un 404 (IA apagada o ticket
+ * anterior a la IA) se traduce a `null` en `getTriage`.
+ *
+ * `category`, `sentiment` y `language` van como `string` y no como union: el
+ * contrato se mantiene a mano, y una categoria nueva en el backend tiene que
+ * llegar a la pantalla (cruda) en vez de romper el tipo.
+ */
+export type TicketTriage =
+  | { status: 'pending' }
+  /** El backend no tiene servicio de IA configurado: no va a llegar nunca. */
+  | { status: 'disabled' }
+  | {
+      status: 'ready';
+      category: string;
+      suggestedPriority: TicketPriority;
+      sentiment: string;
+      language: string;
+      model: string;
+      promptVersion: string;
+      triagedAt: string;
+    };

@@ -5,14 +5,17 @@ import { fechaAbsoluta, tiempoRelativo } from '@/lib/format/relative-time';
 import { cn } from '@/lib/utils';
 import type { TicketPriority, TicketStatus } from '@/lib/api/types';
 
-// Cuatro estados, cuatro señales distintas. `OPEN` es GRIS a propósito: es el
+// Cinco estados, cinco señales distintas. `OPEN` es GRIS a propósito: es el
 // estado de reposo, y pintarlo del mismo azul que `IN_PROGRESS` hacía que el
 // color no distinguiera nada justo donde tiene que distinguir — "nadie lo tocó"
 // de "alguien lo está trabajando". `CLOSED` se separa por forma (contorno sin
-// relleno) en vez de por un quinto tono.
+// relleno) en vez de por un quinto tono. `WAITING_ON_CUSTOMER` va en ámbar y no
+// en el azul de `IN_PROGRESS`: la bandeja tiene que separar "lo estoy
+// trabajando" de "la pelota está del lado del cliente" (ADR-0029).
 const ESTADO_TONO = {
   OPEN: 'neutral',
   IN_PROGRESS: 'progress',
+  WAITING_ON_CUSTOMER: 'warning',
   RESOLVED: 'success',
   CLOSED: 'closed',
 } as const;
@@ -20,6 +23,7 @@ const ESTADO_TONO = {
 const ESTADO_TEXTO: Record<TicketStatus, string> = {
   OPEN: 'Abierto',
   IN_PROGRESS: 'En curso',
+  WAITING_ON_CUSTOMER: 'Esperando al cliente',
   RESOLVED: 'Resuelto',
   CLOSED: 'Cerrado',
 };
