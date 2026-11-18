@@ -1,4 +1,4 @@
-import { clientEnv } from '@/lib/env';
+import { apiHttpBase } from '@/lib/env';
 import { useAuthStore } from '@/stores/auth-store';
 
 /**
@@ -39,7 +39,7 @@ export async function apiFetch<T>(
   // de la app cambia (login, refresh) y una copia quedaría vieja.
   const token = useAuthStore.getState().accessToken;
 
-  const res = await fetch(`${clientEnv.NEXT_PUBLIC_API_URL}${path}`, {
+  const res = await fetch(`${apiHttpBase()}${path}`, {
     ...init,
     credentials: 'include',
     headers: {
