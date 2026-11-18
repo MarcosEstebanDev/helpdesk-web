@@ -23,6 +23,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # ningun efecto sobre el bundle que llega al navegador.
 ARG NEXT_PUBLIC_API_URL=http://localhost:3000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# Proxy `/api/*` hacia la API (ADR-0035). Opcionales: vacías, el front llama a
+# la API directo. También se fijan en build (las rewrites quedan en el manifiesto).
+ARG NEXT_PUBLIC_API_BASE=
+ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
+ARG API_PROXY_TARGET=
+ENV API_PROXY_TARGET=$API_PROXY_TARGET
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm build
